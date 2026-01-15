@@ -4,7 +4,7 @@
 		"@tsconfig/strictest/tsconfig.json",
 	],
 	"compilerOptions": {
-		"types": ["vite/client"],
+		"types": ["vite/client", "@webgpu/types"],
 		"paths": {
 			"~/*": ["./src/*"],
 		},
