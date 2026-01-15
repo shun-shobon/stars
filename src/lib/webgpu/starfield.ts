@@ -453,7 +453,7 @@ export class StarfieldRenderer {
 	private encodeBlurPasses(commandEncoder: GPUCommandEncoder): void {
 		if (!this.blurPipeline) return;
 
-		const blurIterations = 3;
+		const blurIterations = 5;
 		for (let i = 0; i < blurIterations; i += 1) {
 			// 水平ブラー (bloom[0] -> bloom[1])
 			const hBlurPass = commandEncoder.beginRenderPass({

@@ -202,22 +202,28 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let visibleLimit = 6.5;
   let normalizedMag = (mag - uniforms.minMag) / (visibleLimit - uniforms.minMag);
   
+  // 明るさ: 全体的に明るく
   var brightness: f32;
   if (mag <= visibleLimit) {
-    brightness = pow(1.0 - clamp(normalizedMag, 0.0, 1.0), 1.5) * 0.85 + 0.15;
+    brightness = pow(1.0 - clamp(normalizedMag, 0.0, 1.0), 1.2) * 1.2 + 0.4;
   } else {
     let extraDim = (mag - visibleLimit) / (uniforms.maxMag - visibleLimit);
-    brightness = 0.12 * (1.0 - extraDim * 0.7);
+    brightness = 0.35 * (1.0 - extraDim * 0.5);
   }
   
-  // サイズ
+  // サイズ: 明るい星を小さく、全体的にコンパクトに
   var baseSize: f32;
   if (mag <= 1.0) {
-    baseSize = mix(0.015, 0.025, (1.0 - mag) / 2.5);
+    // 一等星以上: 小さめに
+    baseSize = mix(0.006, 0.01, (1.0 - mag) / 2.5);
+  } else if (mag <= 3.0) {
+    // 2-3等星
+    baseSize = mix(0.004, 0.006, 1.0 - (mag - 1.0) / 2.0);
   } else if (mag <= visibleLimit) {
-    baseSize = mix(0.004, 0.015, 1.0 - (mag - 1.0) / (visibleLimit - 1.0));
+    // 4等星以下
+    baseSize = mix(0.0025, 0.004, 1.0 - (mag - 3.0) / (visibleLimit - 3.0));
   } else {
-    baseSize = 0.003;
+    baseSize = 0.002;
   }
   
   // クワッドの頂点位置
@@ -308,12 +314,13 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // 輝度を計算
   let luminance = dot(color.rgb, vec3f(0.299, 0.587, 0.114));
   
-  // 閾値以上の明るい部分のみ抽出
-  let threshold = 0.15;
-  let softness = 0.5;
+  // 閾値を下げてより多くの星をブルームに含める
+  let threshold = 0.05;
+  let softness = 0.3;
   let brightness = smoothstep(threshold, threshold + softness, luminance);
   
-  return vec4f(color.rgb * brightness, 1.0);
+  // ブルームを強化
+  return vec4f(color.rgb * brightness * 1.5, 1.0);
 }
 `;
 
@@ -424,12 +431,12 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let scene = textureSample(sceneTexture, texSampler, input.uv).rgb;
   let bloom = textureSample(bloomTexture, texSampler, input.uv).rgb;
   
-  // シーンとブルームを合成
-  let bloomStrength = 1.2;
-  var color = scene + bloom * bloomStrength;
+  // シーンとブルームを合成（ブルームを強化）
+  let bloomStrength = 2.5;
+  var color = scene * 1.3 + bloom * bloomStrength;
   
-  // 簡易トーンマッピング
-  color = color / (color + vec3f(1.0));
+  // 簡易トーンマッピング（明るさを保持しつつ白飛びを防ぐ）
+  color = color / (color * 0.5 + vec3f(1.0));
   
   // 夜空の背景色を追加
   let skyColor = vec3f(0.0, 0.0, 0.02);
