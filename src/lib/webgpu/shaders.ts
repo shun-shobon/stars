@@ -43,7 +43,7 @@ fn horizontalToCartesian(az: f32, alt: f32) -> vec3f {
 
 // 赤道座標から地平座標へ変換
 fn equatorialToHorizontal(ra: f32, dec: f32, lat: f32, lst: f32) -> vec2f {
-  // 時角
+  // 時角 (Hour Angle)
   let ha = lst - ra;
   
   let sinDec = sin(dec);
@@ -53,20 +53,24 @@ fn equatorialToHorizontal(ra: f32, dec: f32, lat: f32, lst: f32) -> vec2f {
   let cosHa = cos(ha);
   let sinHa = sin(ha);
   
-  // 高度
+  // 高度 (Altitude)
   let sinAlt = sinDec * sinLat + cosDec * cosLat * cosHa;
   let alt = asin(clamp(sinAlt, -1.0, 1.0));
   
-  // 方位角
+  // 方位角 (Azimuth) - 北=0, 東=90度, 南=180度, 西=270度
   let cosAlt = cos(alt);
   var az: f32;
   if (abs(cosAlt) < 0.0001) {
+    // 天頂付近
     az = 0.0;
   } else {
-    let cosAz = (sinDec - sinAlt * sinLat) / (cosAlt * cosLat);
-    az = acos(clamp(cosAz, -1.0, 1.0));
-    if (sinHa > 0.0) {
-      az = 2.0 * 3.14159265359 - az;
+    // atan2を使って方位角を計算（より正確）
+    let x = -sinHa * cosDec;
+    let y = cosLat * sinDec - sinLat * cosDec * cosHa;
+    az = atan2(x, y);
+    // 0〜2πに正規化
+    if (az < 0.0) {
+      az = az + 2.0 * 3.14159265359;
     }
   }
   
