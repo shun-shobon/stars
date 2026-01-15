@@ -2,7 +2,8 @@
  * 星空描画用WGSLシェーダー
  */
 
-export const shaderCode = /* wgsl */ `
+// 星描画用シェーダー（オフスクリーンレンダリング）
+export const starShaderCode = /* wgsl */ `
 struct Uniforms {
   azimuth: f32,      // 観測者の視線方位角
   altitude: f32,     // 観測者の視線高度角
@@ -17,7 +18,7 @@ struct Uniforms {
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
 
 struct VertexInput {
-  @location(0) starData: vec3f,  // ra, dec, magnitude
+  @location(0) starData: vec4f,  // ra, dec, magnitude, B-V color index
   @builtin(vertex_index) vertexIndex: u32,
   @builtin(instance_index) instanceIndex: u32,
 }
@@ -26,7 +27,18 @@ struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) uv: vec2f,
   @location(1) brightness: f32,
-  @location(2) colorTemp: f32,
+  @location(2) starColor: vec3f,
+}
+
+// 地平座標から3Dベクトルへ変換
+fn horizontalToCartesian(az: f32, alt: f32) -> vec3f {
+  let cosAlt = cos(alt);
+  // 北=+Z, 東=+X, 上=+Y の座標系
+  return vec3f(
+    cosAlt * sin(az),   // X: 東方向
+    sin(alt),           // Y: 上方向
+    cosAlt * cos(az)    // Z: 北方向
+  );
 }
 
 // 赤道座標から地平座標へ変換
@@ -61,17 +73,6 @@ fn equatorialToHorizontal(ra: f32, dec: f32, lat: f32, lst: f32) -> vec2f {
   return vec2f(az, alt);
 }
 
-// 地平座標から3Dベクトルへ変換
-fn horizontalToCartesian(az: f32, alt: f32) -> vec3f {
-  let cosAlt = cos(alt);
-  // 北=+Z, 東=+X, 上=+Y の座標系
-  return vec3f(
-    cosAlt * sin(az),   // X: 東方向
-    sin(alt),           // Y: 上方向
-    cosAlt * cos(az)    // Z: 北方向
-  );
-}
-
 // 地平座標から画面座標へ変換
 fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, aspect: f32) -> vec4f {
   // 星の3D位置
@@ -81,8 +82,6 @@ fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, as
   let viewDir = horizontalToCartesian(viewAz, viewAlt);
   
   // 視線方向を基準とした座標系を構築
-  // right: 視線の右方向 (東寄り)
-  // up: 視線の上方向
   let worldUp = vec3f(0.0, 1.0, 0.0);
   var right = cross(viewDir, worldUp);
   
@@ -98,7 +97,6 @@ fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, as
   // 星が視線方向の前方にあるかチェック
   let dotProduct = dot(starDir, viewDir);
   if (dotProduct < 0.0) {
-    // 視線の後ろ側にある星は除外
     return vec4f(0.0, 0.0, -2.0, 1.0);
   }
   
@@ -126,6 +124,54 @@ fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, as
   return vec4f(screenX, screenY, 0.5, w);
 }
 
+// B-V色指数から星の色を計算 (黒体放射に基づく近似)
+fn bvToColor(bv: f32) -> vec3f {
+  // B-V色指数の範囲をクランプ (-0.4 ~ 2.0 が一般的)
+  let bvClamped = clamp(bv, -0.4, 2.0);
+  
+  var r: f32;
+  var g: f32;
+  var b: f32;
+  
+  // 青い星 (B-V < 0): O型、B型星
+  if (bvClamped < 0.0) {
+    let t = (bvClamped + 0.4) / 0.4;  // 0 to 1
+    r = 0.6 + 0.25 * t;
+    g = 0.7 + 0.25 * t;
+    b = 1.0;
+  }
+  // 白〜青白い星 (0 <= B-V < 0.4): A型、F型星
+  else if (bvClamped < 0.4) {
+    let t = bvClamped / 0.4;
+    r = 0.85 + 0.15 * t;
+    g = 0.95 + 0.05 * t;
+    b = 1.0 - 0.05 * t;
+  }
+  // 黄白〜黄色い星 (0.4 <= B-V < 0.8): F型、G型星 (太陽に近い)
+  else if (bvClamped < 0.8) {
+    let t = (bvClamped - 0.4) / 0.4;
+    r = 1.0;
+    g = 1.0 - 0.1 * t;
+    b = 0.95 - 0.2 * t;
+  }
+  // オレンジ色の星 (0.8 <= B-V < 1.4): K型星
+  else if (bvClamped < 1.4) {
+    let t = (bvClamped - 0.8) / 0.6;
+    r = 1.0;
+    g = 0.9 - 0.3 * t;
+    b = 0.75 - 0.35 * t;
+  }
+  // 赤い星 (B-V >= 1.4): M型星
+  else {
+    let t = min((bvClamped - 1.4) / 0.6, 1.0);
+    r = 1.0;
+    g = 0.6 - 0.2 * t;
+    b = 0.4 - 0.2 * t;
+  }
+  
+  return vec3f(r, g, b);
+}
+
 @vertex
 fn vertexMain(input: VertexInput) -> VertexOutput {
   var output: VertexOutput;
@@ -133,6 +179,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let ra = input.starData.x;
   let dec = input.starData.y;
   let mag = input.starData.z;
+  let bv = input.starData.w;
   
   // 地平座標に変換
   let horizontal = equatorialToHorizontal(ra, dec, uniforms.latitude, uniforms.lst);
@@ -144,7 +191,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     output.position = vec4f(0.0, 0.0, -2.0, 1.0);
     output.brightness = 0.0;
     output.uv = vec2f(0.0, 0.0);
-    output.colorTemp = 0.0;
+    output.starColor = vec3f(0.0, 0.0, 0.0);
     return output;
   }
   
@@ -152,35 +199,25 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let screenPos = horizontalToScreen(az, alt, uniforms.azimuth, uniforms.altitude, uniforms.fov, uniforms.aspect);
   
   // 等級から明るさとサイズを計算
-  // 肉眼で見える星は約6等級まで。それより暗い星も表示するが控えめに
-  let visibleLimit = 6.5;  // 肉眼限界等級
-  
-  // 等級を正規化 (明るい星 = 0, 肉眼限界 = 1, それ以上暗い = 1以上)
+  let visibleLimit = 6.5;
   let normalizedMag = (mag - uniforms.minMag) / (visibleLimit - uniforms.minMag);
   
-  // 明るさ: 肉眼で見える星は明るく、それ以上暗い星は控えめに
   var brightness: f32;
   if (mag <= visibleLimit) {
-    // 肉眼で見える星: 1等級ごとに約2.5倍の明るさの差
-    // ただし、表示上は差を圧縮して暗い星も見えるようにする
-    brightness = pow(1.0 - normalizedMag, 1.5) * 0.8 + 0.2;
+    brightness = pow(1.0 - clamp(normalizedMag, 0.0, 1.0), 1.5) * 0.85 + 0.15;
   } else {
-    // 肉眼限界以上に暗い星: かなり控えめに表示
     let extraDim = (mag - visibleLimit) / (uniforms.maxMag - visibleLimit);
-    brightness = 0.15 * (1.0 - extraDim * 0.7);
+    brightness = 0.12 * (1.0 - extraDim * 0.7);
   }
   
-  // サイズ: 明るい星は大きく、暗い星は小さく
+  // サイズ
   var baseSize: f32;
   if (mag <= 1.0) {
-    // 非常に明るい星 (1等星以上)
-    baseSize = mix(0.02, 0.035, (1.0 - mag) / 2.5);
+    baseSize = mix(0.015, 0.025, (1.0 - mag) / 2.5);
   } else if (mag <= visibleLimit) {
-    // 肉眼で見える星
-    baseSize = mix(0.006, 0.02, 1.0 - (mag - 1.0) / (visibleLimit - 1.0));
+    baseSize = mix(0.004, 0.015, 1.0 - (mag - 1.0) / (visibleLimit - 1.0));
   } else {
-    // 暗い星
-    baseSize = 0.004;
+    baseSize = 0.003;
   }
   
   // クワッドの頂点位置
@@ -205,36 +242,199 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   
   output.uv = vertexOffset;
   output.brightness = brightness * screenPos.w;
-  
-  // 等級に基づく色温度 (簡易的: 明るい星は青白く、暗い星は赤っぽく)
-  output.colorTemp = clamp(1.0 - normalizedMag * 0.3, 0.0, 1.0);
+  output.starColor = bvToColor(bv);
   
   return output;
 }
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  // 円形のグラデーション
   let dist = length(input.uv);
   if (dist > 1.0) {
     discard;
   }
   
-  // ガウシアンブルーで星らしいグロー効果
-  let glow = exp(-dist * dist * 2.5);
+  // シャープな星のコア + 軽いグロー
+  let core = smoothstep(1.0, 0.3, dist);
+  let intensity = core * input.brightness;
   
-  // 色計算 (色温度に基づく)
-  let temp = input.colorTemp;
-  let r = mix(1.0, 0.85, temp * 0.3);
-  let g = mix(0.95, 1.0, temp * 0.2);
-  let b = mix(0.9, 1.0, temp * 0.4);
+  return vec4f(input.starColor * intensity, intensity);
+}
+`;
+
+// ブルーム用の輝度抽出シェーダー
+export const brightPassShaderCode = /* wgsl */ `
+@group(0) @binding(0) var inputTexture: texture_2d<f32>;
+@group(0) @binding(1) var inputSampler: sampler;
+
+struct VertexOutput {
+  @builtin(position) position: vec4f,
+  @location(0) uv: vec2f,
+}
+
+@vertex
+fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+  var output: VertexOutput;
   
-  let color = vec3f(r, g, b);
+  // フルスクリーンクワッド
+  let positions = array<vec2f, 6>(
+    vec2f(-1.0, -1.0),
+    vec2f(1.0, -1.0),
+    vec2f(1.0, 1.0),
+    vec2f(-1.0, -1.0),
+    vec2f(1.0, 1.0),
+    vec2f(-1.0, 1.0)
+  );
   
-  // 明るさ適用 - より明るく表示
-  let brightness = input.brightness * glow * 1.5;
-  let alpha = min(brightness * 2.5, 1.0);
+  let uvs = array<vec2f, 6>(
+    vec2f(0.0, 1.0),
+    vec2f(1.0, 1.0),
+    vec2f(1.0, 0.0),
+    vec2f(0.0, 1.0),
+    vec2f(1.0, 0.0),
+    vec2f(0.0, 0.0)
+  );
   
-  return vec4f(color * brightness, alpha);
+  output.position = vec4f(positions[vertexIndex], 0.0, 1.0);
+  output.uv = uvs[vertexIndex];
+  
+  return output;
+}
+
+@fragment
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+  let color = textureSample(inputTexture, inputSampler, input.uv);
+  
+  // 輝度を計算
+  let luminance = dot(color.rgb, vec3f(0.299, 0.587, 0.114));
+  
+  // 閾値以上の明るい部分のみ抽出
+  let threshold = 0.15;
+  let softness = 0.5;
+  let brightness = smoothstep(threshold, threshold + softness, luminance);
+  
+  return vec4f(color.rgb * brightness, 1.0);
+}
+`;
+
+// ガウシアンブラーシェーダー（水平/垂直）
+export const blurShaderCode = /* wgsl */ `
+struct BlurUniforms {
+  direction: vec2f,  // (1,0) for horizontal, (0,1) for vertical
+  texelSize: vec2f,  // 1.0 / textureSize
+}
+
+@group(0) @binding(0) var inputTexture: texture_2d<f32>;
+@group(0) @binding(1) var inputSampler: sampler;
+@group(0) @binding(2) var<uniform> uniforms: BlurUniforms;
+
+struct VertexOutput {
+  @builtin(position) position: vec4f,
+  @location(0) uv: vec2f,
+}
+
+@vertex
+fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+  var output: VertexOutput;
+  
+  let positions = array<vec2f, 6>(
+    vec2f(-1.0, -1.0),
+    vec2f(1.0, -1.0),
+    vec2f(1.0, 1.0),
+    vec2f(-1.0, -1.0),
+    vec2f(1.0, 1.0),
+    vec2f(-1.0, 1.0)
+  );
+  
+  let uvs = array<vec2f, 6>(
+    vec2f(0.0, 1.0),
+    vec2f(1.0, 1.0),
+    vec2f(1.0, 0.0),
+    vec2f(0.0, 1.0),
+    vec2f(1.0, 0.0),
+    vec2f(0.0, 0.0)
+  );
+  
+  output.position = vec4f(positions[vertexIndex], 0.0, 1.0);
+  output.uv = uvs[vertexIndex];
+  
+  return output;
+}
+
+@fragment
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+  // 9-tap ガウシアンブラー
+  let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
+  
+  let offset = uniforms.direction * uniforms.texelSize;
+  
+  var result = textureSample(inputTexture, inputSampler, input.uv).rgb * weights[0];
+  
+  for (var i = 1; i < 5; i++) {
+    let o = offset * f32(i) * 2.0;
+    result += textureSample(inputTexture, inputSampler, input.uv + o).rgb * weights[i];
+    result += textureSample(inputTexture, inputSampler, input.uv - o).rgb * weights[i];
+  }
+  
+  return vec4f(result, 1.0);
+}
+`;
+
+// 最終合成シェーダー
+export const compositeShaderCode = /* wgsl */ `
+@group(0) @binding(0) var sceneTexture: texture_2d<f32>;
+@group(0) @binding(1) var bloomTexture: texture_2d<f32>;
+@group(0) @binding(2) var texSampler: sampler;
+
+struct VertexOutput {
+  @builtin(position) position: vec4f,
+  @location(0) uv: vec2f,
+}
+
+@vertex
+fn vertexMain(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
+  var output: VertexOutput;
+  
+  let positions = array<vec2f, 6>(
+    vec2f(-1.0, -1.0),
+    vec2f(1.0, -1.0),
+    vec2f(1.0, 1.0),
+    vec2f(-1.0, -1.0),
+    vec2f(1.0, 1.0),
+    vec2f(-1.0, 1.0)
+  );
+  
+  let uvs = array<vec2f, 6>(
+    vec2f(0.0, 1.0),
+    vec2f(1.0, 1.0),
+    vec2f(1.0, 0.0),
+    vec2f(0.0, 1.0),
+    vec2f(1.0, 0.0),
+    vec2f(0.0, 0.0)
+  );
+  
+  output.position = vec4f(positions[vertexIndex], 0.0, 1.0);
+  output.uv = uvs[vertexIndex];
+  
+  return output;
+}
+
+@fragment
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+  let scene = textureSample(sceneTexture, texSampler, input.uv).rgb;
+  let bloom = textureSample(bloomTexture, texSampler, input.uv).rgb;
+  
+  // シーンとブルームを合成
+  let bloomStrength = 1.2;
+  var color = scene + bloom * bloomStrength;
+  
+  // 簡易トーンマッピング
+  color = color / (color + vec3f(1.0));
+  
+  // 夜空の背景色を追加
+  let skyColor = vec3f(0.0, 0.0, 0.02);
+  color = max(color, skyColor);
+  
+  return vec4f(color, 1.0);
 }
 `;

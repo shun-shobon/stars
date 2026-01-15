@@ -1,5 +1,7 @@
 {
   "starCount": 117955,
   "minMagnitude": -1.44,
-  "maxMagnitude": 14.08
+  "maxMagnitude": 14.08,
+  "minBV": -0.4,
+  "maxBV": 5.46
 }
