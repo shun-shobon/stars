@@ -86,8 +86,9 @@ fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, as
   let viewDir = horizontalToCartesian(viewAz, viewAlt);
   
   // 視線方向を基準とした座標系を構築
+  // 右手座標系: right = worldUp × viewDir (視線方向を見たときの右方向)
   let worldUp = vec3f(0.0, 1.0, 0.0);
-  var right = cross(viewDir, worldUp);
+  var right = cross(worldUp, viewDir);
   
   // 真上/真下を見ている場合の処理
   if (length(right) < 0.001) {
@@ -96,7 +97,7 @@ fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, as
     right = normalize(right);
   }
   
-  let up = normalize(cross(right, viewDir));
+  let up = normalize(cross(viewDir, right));
   
   // 星が視線方向の前方にあるかチェック
   let dotProduct = dot(starDir, viewDir);
