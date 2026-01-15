@@ -15,6 +15,7 @@ export interface UseStarfieldResult {
 	isLoading: boolean;
 	error: string | null;
 	currentTime: Date;
+	setCurrentTime: (time: Date) => void;
 }
 
 export function useStarfield(): UseStarfieldResult {
@@ -165,7 +166,9 @@ export function useStarfield(): UseStarfieldResult {
 				await renderer.loadStarData();
 				setIsLoading(false);
 			} catch (error_) {
-				setError(error_ instanceof Error ? error_.message : "初期化に失敗しました");
+				setError(
+					error_ instanceof Error ? error_.message : "初期化に失敗しました",
+				);
 				setIsLoading(false);
 			}
 		};
@@ -206,15 +209,7 @@ export function useStarfield(): UseStarfieldResult {
 		const renderer = rendererRef.current;
 		if (!renderer || isLoading || error) return;
 
-		let lastTimeUpdate = 0;
-
-		const render = (timestamp: number): void => {
-			// 時刻を更新 (1秒ごと)
-			if (timestamp - lastTimeUpdate > 1000) {
-				setCurrentTime(new Date());
-				lastTimeUpdate = timestamp;
-			}
-
+		const render = (): void => {
 			renderer.render(camera, currentTime);
 			setDirection(renderer.getDirectionName(camera.azimuth));
 			animationFrameRef.current = requestAnimationFrame(render);
@@ -235,5 +230,6 @@ export function useStarfield(): UseStarfieldResult {
 		isLoading,
 		error,
 		currentTime,
+		setCurrentTime,
 	};
 }

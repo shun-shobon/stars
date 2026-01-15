@@ -3,15 +3,49 @@
  */
 
 import type { FC } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useStarfield } from "~/hooks/useStarfield";
 
 const Starfield: FC = () => {
-	const { canvasRef, direction, altitude, isLoading, error, currentTime } =
-		useStarfield();
+	const {
+		canvasRef,
+		direction,
+		altitude,
+		isLoading,
+		error,
+		currentTime,
+		setCurrentTime,
+	} = useStarfield();
 
 	const containerRef = useRef<HTMLDivElement>(null);
+	const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+
+	// 日付・時刻変更ハンドラー
+	const handleDateTimeChange = (
+		e: React.ChangeEvent<HTMLInputElement>,
+	): void => {
+		const newDate = new Date(e.target.value);
+		if (!Number.isNaN(newDate.getTime())) {
+			setCurrentTime(newDate);
+		}
+	};
+
+	// 現在時刻にリセット
+	const handleResetToNow = (): void => {
+		setCurrentTime(new Date());
+		setIsDatePickerOpen(false);
+	};
+
+	// 日付をdatetime-local形式に変換
+	const formatDateTimeLocal = (date: Date): string => {
+		const year = date.getFullYear();
+		const month = String(date.getMonth() + 1).padStart(2, "0");
+		const day = String(date.getDate()).padStart(2, "0");
+		const hours = String(date.getHours()).padStart(2, "0");
+		const minutes = String(date.getMinutes()).padStart(2, "0");
+		return `${year}-${month}-${day}T${hours}:${minutes}`;
+	};
 
 	// キャンバスサイズをウィンドウに合わせる
 	useEffect(() => {
@@ -84,13 +118,54 @@ const Starfield: FC = () => {
 				<>
 					{/* 上部情報 */}
 					<div className="pointer-events-none absolute top-0 right-0 left-0 p-4">
-						<div className="mx-auto max-w-md rounded-lg bg-black/50 p-4 text-center backdrop-blur-sm">
+						<div className="pointer-events-auto mx-auto max-w-md rounded-lg bg-black/50 p-4 text-center backdrop-blur-sm">
 							<h1 className="mb-2 text-lg font-bold text-white">
 								東京からの星空
 							</h1>
-							<p className="text-sm text-gray-300">
-								{formatDate(currentTime)} {formatTime(currentTime)}
-							</p>
+							<div className="mb-2 flex items-center justify-center gap-2">
+								<p className="text-sm text-gray-300">
+									{formatDate(currentTime)} {formatTime(currentTime)}
+								</p>
+								<button
+									type="button"
+									onClick={() => {
+										setIsDatePickerOpen(!isDatePickerOpen);
+									}}
+									className="rounded bg-blue-600/80 px-2 py-1 text-xs text-white transition-colors hover:bg-blue-500/80"
+									aria-label="日付と時刻を変更"
+								>
+									変更
+								</button>
+							</div>
+							{isDatePickerOpen && (
+								<div className="mt-3 flex flex-col gap-2 border-t border-gray-600 pt-3">
+									<input
+										type="datetime-local"
+										value={formatDateTimeLocal(currentTime)}
+										onChange={handleDateTimeChange}
+										className="rounded bg-gray-800/90 px-3 py-2 text-sm text-white"
+										aria-label="日付と時刻を選択"
+									/>
+									<div className="flex gap-2">
+										<button
+											type="button"
+											onClick={handleResetToNow}
+											className="flex-1 rounded bg-green-600/80 px-3 py-1 text-xs text-white transition-colors hover:bg-green-500/80"
+										>
+											現在時刻
+										</button>
+										<button
+											type="button"
+											onClick={() => {
+												setIsDatePickerOpen(false);
+											}}
+											className="flex-1 rounded bg-gray-600/80 px-3 py-1 text-xs text-white transition-colors hover:bg-gray-500/80"
+										>
+											閉じる
+										</button>
+									</div>
+								</div>
+							)}
 						</div>
 					</div>
 
