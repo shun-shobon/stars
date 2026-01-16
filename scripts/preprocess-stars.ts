@@ -23,11 +23,15 @@ async function processHipparcosData(): Promise<void> {
 		import.meta.dirname,
 		"../hipparcos-voidmain.csv",
 	);
-	const outputDir = path.resolve(import.meta.dirname, "../public");
+	const binaryOutputDir = path.resolve(import.meta.dirname, "../public");
+	const metaOutputDir = path.resolve(import.meta.dirname, "../src/data");
 
 	// 出力ディレクトリ作成
-	if (!fs.existsSync(outputDir)) {
-		fs.mkdirSync(outputDir, { recursive: true });
+	if (!fs.existsSync(binaryOutputDir)) {
+		fs.mkdirSync(binaryOutputDir, { recursive: true });
+	}
+	if (!fs.existsSync(metaOutputDir)) {
+		fs.mkdirSync(metaOutputDir, { recursive: true });
 	}
 
 	const stars: StarData[] = [];
@@ -123,12 +127,12 @@ async function processHipparcosData(): Promise<void> {
 	}
 
 	// バイナリファイル書き込み
-	const binaryPath = path.join(outputDir, "stars.bin");
+	const binaryPath = path.join(binaryOutputDir, "stars.bin");
 	fs.writeFileSync(binaryPath, Buffer.from(buffer));
 	console.log(`バイナリデータを保存: ${binaryPath}`);
 
 	// メタデータ書き込み
-	const metaPath = path.join(outputDir, "stars-meta.json");
+	const metaPath = path.join(metaOutputDir, "stars-meta.json");
 	const meta = {
 		starCount: stars.length,
 		minMagnitude: minMag,

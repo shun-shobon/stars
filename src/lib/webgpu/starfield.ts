@@ -2,6 +2,8 @@
  * WebGPUを使用した星空レンダラー（ブルーム効果付き）
  */
 
+import starsMeta from "~/data/stars-meta.json";
+
 import {
 	blurShaderCode,
 	brightPassShaderCode,
@@ -378,10 +380,8 @@ export class StarfieldRenderer {
 			throw new Error("レンダラーが初期化されていません");
 		}
 
-		// メタデータ読み込み
-		const metaResponse = await fetch("/stars-meta.json");
-		const metaJson: StarfieldMeta = await metaResponse.json();
-		this.meta = metaJson;
+		// メタデータ（importから取得）
+		this.meta = starsMeta;
 		this.starCount = this.meta.starCount;
 
 		// 1星あたり16バイト（4 floats）
