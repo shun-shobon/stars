@@ -107,6 +107,10 @@ async function processHipparcosData(): Promise<void> {
 	console.log(`等級範囲: ${minMag.toString()} ~ ${maxMag.toString()}`);
 	console.log(`B-V色指数範囲: ${minBV.toString()} ~ ${maxBV.toString()}`);
 
+	// 等級順にソート（明るい星 = 小さい等級が先）
+	stars.sort((a, b) => a.mag - b.mag);
+	console.log("等級順にソート完了");
+
 	// バイナリデータ作成 (ra, dec, mag, bv を Float32 で格納)
 	const buffer = new ArrayBuffer(stars.length * 4 * 4); // 4 floats per star
 	const view = new Float32Array(buffer);

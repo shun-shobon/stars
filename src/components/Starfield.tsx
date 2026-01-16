@@ -13,6 +13,7 @@ const Starfield: FC = () => {
 		direction,
 		altitude,
 		isLoading,
+		loadingProgress,
 		error,
 		currentTime,
 		setCurrentTime,
@@ -103,101 +104,93 @@ const Starfield: FC = () => {
 				aria-label="東京からの星空表示。ドラッグで視点移動、ホイールでズーム"
 			/>
 
-			{/* ローディング表示 */}
+			{/* 読み込み中の進捗表示 */}
 			{isLoading && (
-				<div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-					<div className="text-center">
-						<div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
-						<p className="text-white">星空を読み込み中...</p>
+				<div className="pointer-events-none absolute top-4 left-4">
+					<div className="rounded-lg bg-black/50 px-3 py-2 text-sm text-white backdrop-blur-sm">
+						読み込み中... {loadingProgress}%
 					</div>
 				</div>
 			)}
 
-			{/* 情報オーバーレイ */}
-			{!isLoading && (
-				<>
-					{/* 上部情報 */}
-					<div className="pointer-events-none absolute top-0 right-0 left-0 p-4">
-						<div className="pointer-events-auto mx-auto max-w-md rounded-lg bg-black/50 p-4 text-center backdrop-blur-sm">
-							<h1 className="mb-2 text-lg font-bold text-white">
-								東京からの星空
-							</h1>
-							<div className="mb-2 flex items-center justify-center gap-2">
-								<p className="text-sm text-gray-300">
-									{formatDate(currentTime)} {formatTime(currentTime)}
-								</p>
+			{/* 上部情報 */}
+			<div className="pointer-events-none absolute top-0 right-0 left-0 p-4">
+				<div className="pointer-events-auto mx-auto max-w-md rounded-lg bg-black/50 p-4 text-center backdrop-blur-sm">
+					<h1 className="mb-2 text-lg font-bold text-white">東京からの星空</h1>
+					<div className="mb-2 flex items-center justify-center gap-2">
+						<p className="text-sm text-gray-300">
+							{formatDate(currentTime)} {formatTime(currentTime)}
+						</p>
+						<button
+							type="button"
+							onClick={() => {
+								setIsDatePickerOpen(!isDatePickerOpen);
+							}}
+							className="rounded bg-blue-600/80 px-2 py-1 text-xs text-white transition-colors hover:bg-blue-500/80"
+							aria-label="日付と時刻を変更"
+						>
+							変更
+						</button>
+					</div>
+					{isDatePickerOpen && (
+						<div className="mt-3 flex flex-col gap-2 border-t border-gray-600 pt-3">
+							<input
+								type="datetime-local"
+								value={formatDateTimeLocal(currentTime)}
+								onChange={handleDateTimeChange}
+								className="rounded bg-gray-800/90 px-3 py-2 text-sm text-white"
+								aria-label="日付と時刻を選択"
+							/>
+							<div className="flex gap-2">
+								<button
+									type="button"
+									onClick={handleResetToNow}
+									className="flex-1 rounded bg-green-600/80 px-3 py-1 text-xs text-white transition-colors hover:bg-green-500/80"
+								>
+									現在時刻
+								</button>
 								<button
 									type="button"
 									onClick={() => {
-										setIsDatePickerOpen(!isDatePickerOpen);
+										setIsDatePickerOpen(false);
 									}}
-									className="rounded bg-blue-600/80 px-2 py-1 text-xs text-white transition-colors hover:bg-blue-500/80"
-									aria-label="日付と時刻を変更"
+									className="flex-1 rounded bg-gray-600/80 px-3 py-1 text-xs text-white transition-colors hover:bg-gray-500/80"
 								>
-									変更
+									閉じる
 								</button>
 							</div>
-							{isDatePickerOpen && (
-								<div className="mt-3 flex flex-col gap-2 border-t border-gray-600 pt-3">
-									<input
-										type="datetime-local"
-										value={formatDateTimeLocal(currentTime)}
-										onChange={handleDateTimeChange}
-										className="rounded bg-gray-800/90 px-3 py-2 text-sm text-white"
-										aria-label="日付と時刻を選択"
-									/>
-									<div className="flex gap-2">
-										<button
-											type="button"
-											onClick={handleResetToNow}
-											className="flex-1 rounded bg-green-600/80 px-3 py-1 text-xs text-white transition-colors hover:bg-green-500/80"
-										>
-											現在時刻
-										</button>
-										<button
-											type="button"
-											onClick={() => {
-												setIsDatePickerOpen(false);
-											}}
-											className="flex-1 rounded bg-gray-600/80 px-3 py-1 text-xs text-white transition-colors hover:bg-gray-500/80"
-										>
-											閉じる
-										</button>
-									</div>
-								</div>
-							)}
 						</div>
-					</div>
+					)}
+				</div>
+			</div>
 
-					{/* 方角表示 */}
-					<div className="pointer-events-none absolute right-0 bottom-0 left-0 p-4">
-						<div className="mx-auto max-w-md rounded-lg bg-black/50 p-4 backdrop-blur-sm">
-							<div className="flex items-center justify-between text-white">
-								<div className="text-center">
-									<p className="text-xs text-gray-400">方角</p>
-									<p className="text-2xl font-bold">{direction}</p>
-								</div>
-								<div className="text-center">
-									<p className="text-xs text-gray-400">高度</p>
-									<p className="text-2xl font-bold">{altitude.toFixed(1)}°</p>
-								</div>
-								<div className="text-center">
-									<p className="text-xs text-gray-400">観測地</p>
-									<p className="text-lg font-bold">東京</p>
-								</div>
-							</div>
+			{/* 方角表示 */}
+			<div className="pointer-events-none absolute right-0 bottom-0 left-0 p-4">
+				<div className="mx-auto max-w-md rounded-lg bg-black/50 p-4 backdrop-blur-sm">
+					<div className="flex items-center justify-between text-white">
+						<div className="text-center">
+							<p className="text-xs text-gray-400">方角</p>
+							<p className="text-2xl font-bold">{direction}</p>
+						</div>
+						<div className="text-center">
+							<p className="text-xs text-gray-400">高度</p>
+							<p className="text-2xl font-bold">{altitude.toFixed(1)}°</p>
+						</div>
+						<div className="text-center">
+							<p className="text-xs text-gray-400">観測地</p>
+							<p className="text-lg font-bold">東京</p>
 						</div>
 					</div>
+				</div>
+			</div>
 
-					{/* 操作説明 */}
-					<div className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2">
-						<div className="rounded-lg bg-black/30 p-3 text-xs text-gray-400 backdrop-blur-sm">
-							<p className="mb-1">ドラッグ: 視点移動</p>
-							<p>ホイール: ズーム</p>
-						</div>
-					</div>
-				</>
-			)}
+			{/* 操作説明 */}
+			<div className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2">
+				<div className="rounded-lg bg-black/30 p-3 text-xs text-gray-400 backdrop-blur-sm">
+					<p className="mb-1">ドラッグ: 視点移動</p>
+					<p>ホイール: ズーム</p>
+				</div>
+			</div>
 		</div>
 	);
 };

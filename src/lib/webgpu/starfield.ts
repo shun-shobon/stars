@@ -17,6 +17,11 @@ export interface StarfieldMeta {
 	maxBV: number;
 }
 
+export type LoadProgressCallback = (
+	progress: number,
+	loadedCount: number,
+) => void;
+
 export interface CameraState {
 	azimuth: number; // 方位角 (ラジアン)
 	altitude: number; // 高度角 (ラジアン)
@@ -59,6 +64,7 @@ export class StarfieldRenderer {
 	private compositeBindGroup: GPUBindGroup | null = null;
 
 	private starCount = 0;
+	private loadedStarCount = 0;
 	private meta: StarfieldMeta | null = null;
 	private canvas: HTMLCanvasElement | null = null;
 	private width = 0;
@@ -367,31 +373,26 @@ export class StarfieldRenderer {
 		});
 	}
 
-	async loadStarData(): Promise<void> {
+	async loadStarData(onProgress?: LoadProgressCallback): Promise<void> {
 		if (!this.device || !this.starPipeline || !this.uniformBuffer) {
 			throw new Error("レンダラーが初期化されていません");
 		}
 
 		// メタデータ読み込み
 		const metaResponse = await fetch("/stars-meta.json");
-		this.meta = (await metaResponse.json()) as StarfieldMeta;
+		const metaJson: StarfieldMeta = await metaResponse.json();
+		this.meta = metaJson;
 		this.starCount = this.meta.starCount;
 
-		// バイナリデータ読み込み
-		const dataResponse = await fetch("/stars.bin");
-		const arrayBuffer = await dataResponse.arrayBuffer();
+		// 1星あたり16バイト（4 floats）
+		const bytesPerStar = 16;
+		const totalBytes = this.starCount * bytesPerStar;
 
-		// 星データバッファ作成
+		// 星データバッファを事前に最大サイズで作成
 		this.starBuffer = this.device.createBuffer({
-			size: arrayBuffer.byteLength,
+			size: totalBytes,
 			usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
 		});
-
-		this.device.queue.writeBuffer(
-			this.starBuffer,
-			0,
-			new Float32Array(arrayBuffer),
-		);
 
 		// 星描画用バインドグループ作成
 		this.starBindGroup = this.device.createBindGroup({
@@ -403,6 +404,68 @@ export class StarfieldRenderer {
 				},
 			],
 		});
+
+		// ストリーミング読み込み
+		const dataResponse = await fetch("/stars.bin");
+		if (!dataResponse.body) {
+			throw new Error("ストリーム読み込みがサポートされていません");
+		}
+
+		const reader = dataResponse.body.getReader();
+		let receivedBytes = 0;
+		let pendingBuffer = new Uint8Array(0);
+
+		while (true) {
+			const { done, value } = await reader.read();
+
+			if (done) {
+				break;
+			}
+
+			// 前回の残りと今回のチャンクを結合
+			const combined = new Uint8Array(pendingBuffer.length + value.length);
+			combined.set(pendingBuffer);
+			combined.set(value, pendingBuffer.length);
+
+			// 16バイト境界で処理
+			const alignedBytes =
+				Math.floor(combined.length / bytesPerStar) * bytesPerStar;
+
+			if (alignedBytes > 0) {
+				// GPUバッファに書き込み
+				const alignedData = combined.slice(0, alignedBytes);
+				this.device.queue.writeBuffer(
+					this.starBuffer,
+					receivedBytes,
+					alignedData,
+				);
+
+				receivedBytes += alignedBytes;
+				this.loadedStarCount = receivedBytes / bytesPerStar;
+
+				// 進捗コールバック
+				if (onProgress) {
+					const progress = Math.round((receivedBytes / totalBytes) * 100);
+					onProgress(progress, this.loadedStarCount);
+				}
+			}
+
+			// 余りを保持
+			pendingBuffer = combined.slice(alignedBytes);
+		}
+
+		// 残りのデータがあれば処理（通常はないはず）
+		if (pendingBuffer.length > 0) {
+			console.warn(
+				`未処理のデータが残っています: ${pendingBuffer.length.toString()} bytes`,
+			);
+		}
+
+		// 読み込み完了
+		this.loadedStarCount = this.starCount;
+		if (onProgress) {
+			onProgress(100, this.loadedStarCount);
+		}
 	}
 
 	private isRenderReady(): boolean {
@@ -414,8 +477,13 @@ export class StarfieldRenderer {
 			this.uniformBuffer &&
 			this.starBindGroup &&
 			this.canvas &&
-			this.meta,
+			this.meta &&
+			this.loadedStarCount > 0,
 		);
+	}
+
+	getLoadedStarCount(): number {
+		return this.loadedStarCount;
 	}
 
 	private isPostProcessReady(): boolean {
@@ -518,7 +586,7 @@ export class StarfieldRenderer {
 		starPass.setPipeline(this.starPipeline!);
 		starPass.setBindGroup(0, this.starBindGroup);
 		starPass.setVertexBuffer(0, this.starBuffer);
-		starPass.draw(6, this.starCount);
+		starPass.draw(6, this.loadedStarCount);
 		starPass.end();
 
 		// Pass 2: 輝度抽出（シーン -> bloom[0]）

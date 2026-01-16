@@ -13,6 +13,7 @@ export interface UseStarfieldResult {
 	direction: string;
 	altitude: number;
 	isLoading: boolean;
+	loadingProgress: number;
 	error: string | null;
 	currentTime: Date;
 	setCurrentTime: (time: Date) => void;
@@ -31,6 +32,7 @@ export function useStarfield(): UseStarfieldResult {
 
 	const [direction, setDirection] = useState("北");
 	const [isLoading, setIsLoading] = useState(true);
+	const [loadingProgress, setLoadingProgress] = useState(0);
 	const [error, setError] = useState<string | null>(null);
 	const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -163,7 +165,9 @@ export function useStarfield(): UseStarfieldResult {
 		const init = async (): Promise<void> => {
 			try {
 				await renderer.init(canvas);
-				await renderer.loadStarData();
+				await renderer.loadStarData((progress) => {
+					setLoadingProgress(progress);
+				});
 				setIsLoading(false);
 			} catch (error_) {
 				setError(
@@ -207,7 +211,7 @@ export function useStarfield(): UseStarfieldResult {
 	// レンダリングループ
 	useEffect(() => {
 		const renderer = rendererRef.current;
-		if (!renderer || isLoading || error) return;
+		if (!renderer || error) return;
 
 		const render = (): void => {
 			renderer.render(camera, currentTime);
@@ -220,7 +224,7 @@ export function useStarfield(): UseStarfieldResult {
 		return () => {
 			cancelAnimationFrame(animationFrameRef.current);
 		};
-	}, [camera, currentTime, isLoading, error]);
+	}, [camera, currentTime, error]);
 
 	return {
 		canvasRef,
@@ -228,6 +232,7 @@ export function useStarfield(): UseStarfieldResult {
 		direction,
 		altitude: (camera.altitude * 180) / Math.PI,
 		isLoading,
+		loadingProgress,
 		error,
 		currentTime,
 		setCurrentTime,
