@@ -1,0 +1,9 @@
+name = "stars"
+compatibility_date = "2026-01-11"
+main = "src/worker.ts"
+minify = true
+
+[assets]
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]

@@ -5,7 +5,9 @@ minimumReleaseAgeExclude:
 
 onlyBuiltDependencies:
   - esbuild
+  - sharp
   - unrs-resolver
+  - workerd
 
 saveExact: true
 
@@ -14,5 +16,5 @@ strictDepBuilds: true
 trustPolicy: no-downgrade
 
 trustPolicyExclude:
-  - "reselect@5.1.1"
-  - "semver@6.3.1"
+  - reselect@5.1.1
+  - semver@6.3.1
