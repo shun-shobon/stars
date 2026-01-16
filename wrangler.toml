@@ -1,7 +1,6 @@
 name = "stars"
 compatibility_date = "2026-01-11"
 main = "src/worker.ts"
-minify = true
 
 [observability]
 enabled = true
