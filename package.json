@@ -1,8 +1,8 @@
 {
-	"name": "@shun-shobon/web-app-template",
+	"name": "stars",
 	"version": "0.1.0",
 	"type": "module",
-	"description": "This is a template for a web app. It uses Vite, React, TypeScript and Chakra UI.",
+	"description": "WebGPUを使用した星空レンダリングWebアプリケーション。東京からの星空をリアルタイムで表示します。",
 	"author": "NISHIZAWA Shuntaro <me@s2n.tech> (https://s2n.tech/)",
 	"license": "MIT",
 	"private": true,

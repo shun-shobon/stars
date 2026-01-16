@@ -1,17 +1,22 @@
-# Web App Template
+# Stars
 
-このプロジェクトは、モダンなWebアプリケーション開発のためのテンプレートです。
+WebGPUを使用した星空レンダリングWebアプリケーション。東京からの星空をリアルタイムで表示し、ドラッグ操作で視点を変更できます。
+
+## 機能
+
+- WebGPUによる高速な星空レンダリング
+- 東京（緯度35.6762°、経度139.6503°）からの視点
+- マウスドラッグによる視点操作
+- リアルタイムな星の位置計算
 
 ## 技術スタック
 
-- Node.js
-- pnpm
-- React
+- React 19
 - TypeScript
+- Vite
 - Tailwind CSS
-- Base UI
-- ESLint
-- Prettier
+- WebGPU API
+- Cloudflare Workers（デプロイ）
 
 ## セットアップ
 
@@ -37,6 +42,12 @@ pnpm dev
 
 # プロダクションビルド
 pnpm build
+
+# ローカルプレビュー（Wrangler）
+pnpm preview
+
+# デプロイ
+pnpm deploy
 
 # コードのフォーマット
 pnpm format
