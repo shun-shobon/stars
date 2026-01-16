@@ -203,33 +203,42 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   // 画面座標に変換
   let screenPos = horizontalToScreen(az, alt, uniforms.azimuth, uniforms.altitude, uniforms.fov, uniforms.aspect);
   
-  // 等級から明るさとサイズを計算
+  // 等級から明るさとサイズを計算（等級差ベース + ソフトニー圧縮）
+  // 等級差: 1等級 = 2.512倍の光度比
+  // flux = 10^(-0.4 * mag)
+  let flux = pow(10.0, -0.4 * mag);
+  
+  // 参照等級（2等星を基準にして1〜3等星が目立つように）
+  let refMag = 2.0;
+  let refFlux = pow(10.0, -0.4 * refMag);
+  
+  // ソフトニー圧縮（極端な明るさを滑らかに抑制、クランプなし）
+  // knee値が大きいほど圧縮が強くなる
+  let knee = 0.8 * refFlux;
+  let toneFlux = flux / (flux + knee);
+  let toneRef = refFlux / (refFlux + knee);
+  
+  // 正規化された明るさ（参照等級で1.0になる）
+  let normalizedBrightness = toneFlux / toneRef;
+  
+  // 明るさ: ガンマ補正で中間域を持ち上げ
+  let brightnessGamma = 0.6;
+  let brightnessScale = 1.5;
+  let brightnessOffset = 0.4;
+  var brightness = pow(normalizedBrightness, brightnessGamma) * brightnessScale + brightnessOffset;
+  
+  // 6.5等星より暗い星は減衰
   let visibleLimit = 6.5;
-  let normalizedMag = (mag - uniforms.minMag) / (visibleLimit - uniforms.minMag);
-  
-  // 明るさ: 全体的に明るく
-  var brightness: f32;
-  if (mag <= visibleLimit) {
-    brightness = pow(1.0 - clamp(normalizedMag, 0.0, 1.0), 1.2) * 1.2 + 0.4;
-  } else {
+  if (mag > visibleLimit) {
     let extraDim = (mag - visibleLimit) / (uniforms.maxMag - visibleLimit);
-    brightness = 0.35 * (1.0 - extraDim * 0.5);
+    brightness = brightness * (1.0 - extraDim * 0.7);
   }
   
-  // サイズ: 明るい星を小さく、全体的にコンパクトに
-  var baseSize: f32;
-  if (mag <= 1.0) {
-    // 一等星以上: 小さめに
-    baseSize = mix(0.006, 0.01, (1.0 - mag) / 2.5);
-  } else if (mag <= 3.0) {
-    // 2-3等星
-    baseSize = mix(0.004, 0.006, 1.0 - (mag - 1.0) / 2.0);
-  } else if (mag <= visibleLimit) {
-    // 4等星以下
-    baseSize = mix(0.0025, 0.004, 1.0 - (mag - 3.0) / (visibleLimit - 3.0));
-  } else {
-    baseSize = 0.002;
-  }
+  // サイズ: 同じソフトニー曲線を使用（全体的にコンパクトに）
+  let sizeGamma = 0.45;
+  let minSize = 0.0015;
+  let sizeRange = 0.004;
+  var baseSize = minSize + sizeRange * pow(normalizedBrightness, sizeGamma);
   
   // クワッドの頂点位置
   let quadVertices = array<vec2f, 6>(
@@ -319,13 +328,18 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // 輝度を計算
   let luminance = dot(color.rgb, vec3f(0.299, 0.587, 0.114));
   
-  // 閾値を下げてより多くの星をブルームに含める
-  let threshold = 0.05;
-  let softness = 0.3;
-  let brightness = smoothstep(threshold, threshold + softness, luminance);
+  // ソフトニー圧縮で極端な輝度を抑制（1〜3等星を残しつつシリウス級を抑える）
+  let knee = 0.5;
+  let tonedLuminance = luminance / (luminance + knee);
   
-  // ブルームを強化
-  return vec4f(color.rgb * brightness * 1.5, 1.0);
+  // 閾値を少し上げ、softnessを広げて中間域のブルームを確保
+  let threshold = 0.08;
+  let softness = 0.4;
+  let bloomMask = smoothstep(threshold, threshold + softness, tonedLuminance);
+  
+  // ブルーム強度を調整（極端な明るさは圧縮済みなので控えめに）
+  let bloomIntensity = 1.2;
+  return vec4f(color.rgb * bloomMask * bloomIntensity, 1.0);
 }
 `;
 
@@ -436,12 +450,14 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let scene = textureSample(sceneTexture, texSampler, input.uv).rgb;
   let bloom = textureSample(bloomTexture, texSampler, input.uv).rgb;
   
-  // シーンとブルームを合成（ブルームを強化）
-  let bloomStrength = 2.5;
-  var color = scene * 1.3 + bloom * bloomStrength;
+  // シーンとブルームを合成（ブルーム強度を調整して1〜3等星を目立たせる）
+  let bloomStrength = 2.0;
+  var color = scene * 1.2 + bloom * bloomStrength;
   
-  // 簡易トーンマッピング（明るさを保持しつつ白飛びを防ぐ）
-  color = color / (color * 0.5 + vec3f(1.0));
+  // ソフトなトーンマッピング（極端な明るさを抑えつつ中間域を保持）
+  // Reinhard拡張: より緩やかな圧縮
+  let whitePoint = 2.5;
+  color = color * (1.0 + color / (whitePoint * whitePoint)) / (1.0 + color);
   
   // 夜空の背景色を追加
   let skyColor = vec3f(0.0, 0.0, 0.02);
