@@ -21,6 +21,8 @@ export interface UseStarfieldResult {
 	error: string | null;
 	currentTime: Date;
 	setCurrentTime: (time: Date) => void;
+	isRealtimeMode: boolean;
+	setRealtimeMode: (enabled: boolean) => void;
 }
 
 export function useStarfield(): UseStarfieldResult {
@@ -39,6 +41,7 @@ export function useStarfield(): UseStarfieldResult {
 	const [loadingProgress, setLoadingProgress] = useState(0);
 	const [error, setError] = useState<string | null>(null);
 	const [currentTime, setCurrentTime] = useState(new Date());
+	const [isRealtimeMode, setRealtimeMode] = useState(true);
 
 	// カメラ制御フック
 	const {
@@ -109,6 +112,19 @@ export function useStarfield(): UseStarfieldResult {
 		handleProgress,
 	]);
 
+	// リアルタイムモードの時刻更新
+	useEffect(() => {
+		if (!isRealtimeMode) return;
+
+		const interval = setInterval(() => {
+			setCurrentTime(new Date());
+		}, 1000);
+
+		return () => {
+			clearInterval(interval);
+		};
+	}, [isRealtimeMode]);
+
 	// レンダリングループ
 	useEffect(() => {
 		const renderer = rendererRef.current;
@@ -137,5 +153,7 @@ export function useStarfield(): UseStarfieldResult {
 		error,
 		currentTime,
 		setCurrentTime,
+		isRealtimeMode,
+		setRealtimeMode,
 	};
 }

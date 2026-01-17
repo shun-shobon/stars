@@ -25,6 +25,7 @@ const Starfield: FC = () => {
 		error,
 		currentTime,
 		setCurrentTime,
+		setRealtimeMode,
 	} = useStarfield();
 
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -42,22 +43,24 @@ const Starfield: FC = () => {
 		};
 	}, []);
 
-	// 日付・時刻変更ハンドラー
+	// 日付・時刻変更ハンドラー（指定時刻モードに切り替え）
 	const handleDateTimeChange = useCallback(
 		(e: React.ChangeEvent<HTMLInputElement>): void => {
 			const newDate = new Date(e.target.value);
 			if (!Number.isNaN(newDate.getTime())) {
+				setRealtimeMode(false);
 				setCurrentTime(newDate);
 			}
 		},
-		[setCurrentTime],
+		[setCurrentTime, setRealtimeMode],
 	);
 
-	// 現在時刻にリセット
+	// 現在時刻にリセット（リアルタイムモードに戻す）
 	const handleResetToNow = useCallback((): void => {
+		setRealtimeMode(true);
 		setCurrentTime(new Date());
 		setIsDatePickerOpen(false);
-	}, [setCurrentTime]);
+	}, [setCurrentTime, setRealtimeMode]);
 
 	// 日時ピッカーの開閉
 	const handleDatePickerToggle = useCallback((): void => {
