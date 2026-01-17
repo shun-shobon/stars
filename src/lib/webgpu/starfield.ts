@@ -257,7 +257,7 @@ export class StarfieldRenderer {
 		cameraUniformData[0] = camera.altitude; // 視線の高度角
 		cameraUniformData[1] = camera.fov; // 視野角
 		cameraUniformData[2] = this.canvas.width / this.canvas.height; // アスペクト比
-		cameraUniformData[3] = 0; // padding
+		cameraUniformData[3] = camera.azimuth; // 方位角（silhouette用）
 
 		// background用のカメラuniform更新
 		if (this.postProcessBindGroups?.backgroundUniformBuffer) {

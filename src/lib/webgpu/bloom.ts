@@ -94,7 +94,7 @@ export function createPostProcessBindGroups(
 	textures: RenderTextures,
 	sampler: GPUSampler,
 ): PostProcessBindGroups {
-	// 背景用uniformバッファ（カメラ情報：altitude, fov, aspect, padding）
+	// 背景用uniformバッファ（カメラ情報：altitude, fov, aspect, azimuth）
 	const backgroundUniformBuffer = device.createBuffer({
 		size: 16, // 4 floats
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
@@ -131,7 +131,7 @@ export function createPostProcessBindGroups(
 		],
 	});
 
-	// シルエット用uniformバッファ（カメラ情報：altitude, fov, aspect, padding）
+	// シルエット用uniformバッファ（カメラ情報：altitude, fov, aspect, azimuth）
 	const silhouetteUniformBuffer = device.createBuffer({
 		size: 16, // 4 floats
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,

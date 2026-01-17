@@ -2,7 +2,7 @@
  * 背景（光害グラデーション）シェーダー
  */
 
-import { fullscreenQuadVertex } from "./common";
+import { fullscreenQuadVertex, inversePerspectiveFunctions } from "./common";
 
 export const backgroundShaderCode = /* wgsl */ `
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
@@ -11,8 +11,10 @@ struct CameraUniforms {
   altitude: f32,     // 視線の高度角 (ラジアン)
   fov: f32,          // 視野角 (ラジアン)
   aspect: f32,       // アスペクト比
-  padding: f32,
+  azimuth: f32,      // 方位角 (ラジアン)
 }
+
+${inversePerspectiveFunctions}
 
 ${fullscreenQuadVertex}
 
@@ -51,11 +53,9 @@ fn calculateSkyglow(pixelAltitude: f32) -> vec3f {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  // このピクセルが見ている高度を計算
-  // UV座標から視線方向を再構築
-  let screenY = (0.5 - input.uv.y) * 2.0; // -1 to 1 (上が正)
-  let verticalAngle = atan(screenY * tan(camera.fov * 0.5));
-  let pixelAltitude = camera.altitude + verticalAngle;
+  // UV座標から正確な高度を計算（透視投影の逆変換）
+  let horizontal = uvToHorizontal(input.uv, camera.azimuth, camera.altitude, camera.fov, camera.aspect);
+  let pixelAltitude = horizontal.y;
   
   // 街明かりの光害を計算
   let skyglow = calculateSkyglow(pixelAltitude);
