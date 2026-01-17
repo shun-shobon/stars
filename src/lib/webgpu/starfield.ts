@@ -251,6 +251,40 @@ export class StarfieldRenderer {
 		uniformData[7] = this.meta.maxMagnitude;
 
 		this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
+
+		// 共通のカメラuniformデータ（background, composite, silhouette用）
+		const cameraUniformData = new Float32Array(4);
+		cameraUniformData[0] = camera.altitude; // 視線の高度角
+		cameraUniformData[1] = camera.fov; // 視野角
+		cameraUniformData[2] = this.canvas.width / this.canvas.height; // アスペクト比
+		cameraUniformData[3] = 0; // padding
+
+		// background用のカメラuniform更新
+		if (this.postProcessBindGroups?.backgroundUniformBuffer) {
+			this.device.queue.writeBuffer(
+				this.postProcessBindGroups.backgroundUniformBuffer,
+				0,
+				cameraUniformData,
+			);
+		}
+
+		// composite用のカメラuniform更新
+		if (this.postProcessBindGroups?.compositeUniformBuffer) {
+			this.device.queue.writeBuffer(
+				this.postProcessBindGroups.compositeUniformBuffer,
+				0,
+				cameraUniformData,
+			);
+		}
+
+		// silhouette用のカメラuniform更新
+		if (this.postProcessBindGroups?.silhouetteUniformBuffer) {
+			this.device.queue.writeBuffer(
+				this.postProcessBindGroups.silhouetteUniformBuffer,
+				0,
+				cameraUniformData,
+			);
+		}
 	}
 
 	render(camera: CameraState, time: Date): void {
@@ -270,13 +304,28 @@ export class StarfieldRenderer {
 
 		const commandEncoder = this.device!.createCommandEncoder();
 
-		// Pass 1: 星をオフスクリーンテクスチャに描画
+		// Pass 1: 背景（光害グラデーション）をオフスクリーンテクスチャに描画
+		const backgroundPass = commandEncoder.beginRenderPass({
+			colorAttachments: [
+				{
+					view: this.textures!.sceneView,
+					clearValue: { r: 0, g: 0, b: 0, a: 1 },
+					loadOp: "clear",
+					storeOp: "store",
+				},
+			],
+		});
+		backgroundPass.setPipeline(this.pipelines!.background);
+		backgroundPass.setBindGroup(0, this.postProcessBindGroups!.background);
+		backgroundPass.draw(6);
+		backgroundPass.end();
+
+		// Pass 2: 星を加算ブレンドで背景の上に描画
 		const starPass = commandEncoder.beginRenderPass({
 			colorAttachments: [
 				{
 					view: this.textures!.sceneView,
-					clearValue: { r: 0, g: 0, b: 0.01, a: 1 },
-					loadOp: "clear",
+					loadOp: "load", // 背景を保持
 					storeOp: "store",
 				},
 			],
@@ -287,7 +336,7 @@ export class StarfieldRenderer {
 		starPass.draw(6, this.loadedStarCount);
 		starPass.end();
 
-		// Pass 2: 輝度抽出（シーン -> bloom[0]）
+		// Pass 3: 輝度抽出（シーン -> bloom[0]）
 		const brightPass = commandEncoder.beginRenderPass({
 			colorAttachments: [
 				{
@@ -303,7 +352,7 @@ export class StarfieldRenderer {
 		brightPass.draw(6);
 		brightPass.end();
 
-		// Pass 3-4: ガウシアンブラー
+		// Pass 4-5: ガウシアンブラー
 		encodeBlurPasses(
 			commandEncoder,
 			this.pipelines!,
@@ -311,7 +360,7 @@ export class StarfieldRenderer {
 			this.blurResources!,
 		);
 
-		// Pass 5: 最終合成（シーン + ブルーム -> 画面）
+		// Pass 6: 最終合成（シーン + ブルーム -> 画面）
 		const compositePass = commandEncoder.beginRenderPass({
 			colorAttachments: [
 				{
@@ -326,6 +375,21 @@ export class StarfieldRenderer {
 		compositePass.draw(6);
 		compositePass.end();
 
+		// Pass 7: シルエット（建物スカイライン）を最前面に描画
+		const silhouettePass = commandEncoder.beginRenderPass({
+			colorAttachments: [
+				{
+					view: this.context!.getCurrentTexture().createView(),
+					loadOp: "load", // 合成結果を保持
+					storeOp: "store",
+				},
+			],
+		});
+		silhouettePass.setPipeline(this.pipelines!.silhouette);
+		silhouettePass.setBindGroup(0, this.postProcessBindGroups!.silhouette);
+		silhouettePass.draw(6);
+		silhouettePass.end();
+
 		this.device!.queue.submit([commandEncoder.finish()]);
 	}
 
@@ -336,6 +400,9 @@ export class StarfieldRenderer {
 	dispose(): void {
 		this.starBuffer?.destroy();
 		this.uniformBuffer?.destroy();
+		this.postProcessBindGroups?.backgroundUniformBuffer?.destroy();
+		this.postProcessBindGroups?.compositeUniformBuffer?.destroy();
+		this.postProcessBindGroups?.silhouetteUniformBuffer?.destroy();
 		destroyRenderTextures(this.textures);
 		destroyBlurResources(this.blurResources);
 		this.device?.destroy();

@@ -3,17 +3,21 @@
  */
 
 import {
+	backgroundShaderCode,
 	blurShaderCode,
 	brightPassShaderCode,
 	compositeShaderCode,
+	silhouetteShaderCode,
 	starShaderCode,
 } from "./shaders";
 
 export interface Pipelines {
+	background: GPURenderPipeline;
 	star: GPURenderPipeline;
 	brightPass: GPURenderPipeline;
 	blur: GPURenderPipeline;
 	composite: GPURenderPipeline;
+	silhouette: GPURenderPipeline;
 }
 
 /**
@@ -23,6 +27,29 @@ export function createPipelines(
 	device: GPUDevice,
 	format: GPUTextureFormat,
 ): Pipelines {
+	// 背景（光害グラデーション）パイプライン
+	const backgroundModule = device.createShaderModule({
+		label: "Background shader",
+		code: backgroundShaderCode,
+	});
+
+	const background = device.createRenderPipeline({
+		label: "Background pipeline",
+		layout: "auto",
+		vertex: {
+			module: backgroundModule,
+			entryPoint: "vertexMain",
+		},
+		fragment: {
+			module: backgroundModule,
+			entryPoint: "fragmentMain",
+			targets: [{ format: "rgba16float" }],
+		},
+		primitive: {
+			topology: "triangle-list",
+		},
+	});
+
 	// 星描画パイプライン
 	const starShaderModule = device.createShaderModule({
 		label: "Star shader",
@@ -138,5 +165,28 @@ export function createPipelines(
 		},
 	});
 
-	return { star, brightPass, blur, composite };
+	// シルエット（建物スカイライン）パイプライン
+	const silhouetteModule = device.createShaderModule({
+		label: "Silhouette shader",
+		code: silhouetteShaderCode,
+	});
+
+	const silhouette = device.createRenderPipeline({
+		label: "Silhouette pipeline",
+		layout: "auto",
+		vertex: {
+			module: silhouetteModule,
+			entryPoint: "vertexMain",
+		},
+		fragment: {
+			module: silhouetteModule,
+			entryPoint: "fragmentMain",
+			targets: [{ format }],
+		},
+		primitive: {
+			topology: "triangle-list",
+		},
+	});
+
+	return { background, star, brightPass, blur, composite, silhouette };
 }

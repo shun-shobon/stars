@@ -1,5 +1,6 @@
 /**
  * 最終合成シェーダー
+ * シーンテクスチャ（背景+星）とブルームテクスチャを合成
  */
 
 import { fullscreenQuadVertex } from "./common";
@@ -24,10 +25,6 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // Reinhard拡張: より緩やかな圧縮
   let whitePoint = 2.5;
   color = color * (1.0 + color / (whitePoint * whitePoint)) / (1.0 + color);
-  
-  // 夜空の背景色を追加
-  let skyColor = vec3f(0.0, 0.0, 0.02);
-  color = max(color, skyColor);
   
   return vec4f(color, 1.0);
 }

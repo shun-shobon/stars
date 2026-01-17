@@ -190,8 +190,8 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let az = horizontal.x;
   let alt = horizontal.y;
   
-  // 地平線以下の星を除外
-  if (alt < -0.1) {
+  // 地平線以下の星を除外（0度でカットオフ）
+  if (alt < 0.0) {
     output.position = vec4f(0.0, 0.0, -2.0, 1.0);
     output.brightness = 0.0;
     output.uv = vec2f(0.0, 0.0);

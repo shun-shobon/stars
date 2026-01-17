@@ -13,8 +13,13 @@ export interface BlurResources {
 }
 
 export interface PostProcessBindGroups {
+	background: GPUBindGroup;
+	backgroundUniformBuffer: GPUBuffer;
 	brightPass: GPUBindGroup;
 	composite: GPUBindGroup;
+	compositeUniformBuffer: GPUBuffer;
+	silhouette: GPUBindGroup;
+	silhouetteUniformBuffer: GPUBuffer;
 }
 
 /**
@@ -89,6 +94,18 @@ export function createPostProcessBindGroups(
 	textures: RenderTextures,
 	sampler: GPUSampler,
 ): PostProcessBindGroups {
+	// 背景用uniformバッファ（カメラ情報：altitude, fov, aspect, padding）
+	const backgroundUniformBuffer = device.createBuffer({
+		size: 16, // 4 floats
+		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+	});
+
+	// 背景用バインドグループ
+	const background = device.createBindGroup({
+		layout: pipelines.background.getBindGroupLayout(0),
+		entries: [{ binding: 0, resource: { buffer: backgroundUniformBuffer } }],
+	});
+
 	// 輝度抽出用バインドグループ
 	const brightPass = device.createBindGroup({
 		layout: pipelines.brightPass.getBindGroupLayout(0),
@@ -96,6 +113,12 @@ export function createPostProcessBindGroups(
 			{ binding: 0, resource: textures.sceneView },
 			{ binding: 1, resource: sampler },
 		],
+	});
+
+	// 合成用uniformバッファ（カメラ情報：altitude, fov, aspect, padding）
+	const compositeUniformBuffer = device.createBuffer({
+		size: 16, // 4 floats
+		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	});
 
 	// 合成用バインドグループ
@@ -108,7 +131,27 @@ export function createPostProcessBindGroups(
 		],
 	});
 
-	return { brightPass, composite };
+	// シルエット用uniformバッファ（カメラ情報：altitude, fov, aspect, padding）
+	const silhouetteUniformBuffer = device.createBuffer({
+		size: 16, // 4 floats
+		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+	});
+
+	// シルエット用バインドグループ
+	const silhouette = device.createBindGroup({
+		layout: pipelines.silhouette.getBindGroupLayout(0),
+		entries: [{ binding: 0, resource: { buffer: silhouetteUniformBuffer } }],
+	});
+
+	return {
+		background,
+		backgroundUniformBuffer,
+		brightPass,
+		composite,
+		compositeUniformBuffer,
+		silhouette,
+		silhouetteUniformBuffer,
+	};
 }
 
 /**
