@@ -400,9 +400,9 @@ export class StarfieldRenderer {
 	dispose(): void {
 		this.starBuffer?.destroy();
 		this.uniformBuffer?.destroy();
-		this.postProcessBindGroups?.backgroundUniformBuffer?.destroy();
-		this.postProcessBindGroups?.compositeUniformBuffer?.destroy();
-		this.postProcessBindGroups?.silhouetteUniformBuffer?.destroy();
+		this.postProcessBindGroups?.backgroundUniformBuffer.destroy();
+		this.postProcessBindGroups?.compositeUniformBuffer.destroy();
+		this.postProcessBindGroups?.silhouetteUniformBuffer.destroy();
 		destroyRenderTextures(this.textures);
 		destroyBlurResources(this.blurResources);
 		this.device?.destroy();
