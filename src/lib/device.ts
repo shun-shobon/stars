@@ -2,6 +2,8 @@
  * デバイス検出とパフォーマンスプロファイル
  */
 
+import starsMeta from "~/data/stars-meta.json";
+
 /**
  * パフォーマンスプロファイル
  */
@@ -92,6 +94,7 @@ export function getPerformanceProfile(
 	deviceType?: DeviceType,
 ): PerformanceProfile {
 	const type = deviceType ?? detectDeviceType();
+	const totalStars = starsMeta.starCount;
 
 	switch (type) {
 		case "mobile":
@@ -114,7 +117,7 @@ export function getPerformanceProfile(
 			};
 		case "desktop":
 			return {
-				maxStars: 117_955, // 全て表示
+				maxStars: totalStars, // 全て表示
 				bloomIterations: 3, // 5 → 3に削減（デスクトップでも少し軽く）
 				bloomDownscale: 2, // 1/2のまま
 				blurTaps: 9, // 9のまま

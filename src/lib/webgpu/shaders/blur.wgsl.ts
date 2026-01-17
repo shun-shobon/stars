@@ -22,6 +22,8 @@ ${fullscreenQuadVertex}
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // 5-tap ガウシアンブラー（軽量版）
+  // 重みはガウス分布（σ=1.0）を5サンプルで近似したもの
+  // 正規化済み: sum(weights) = 1.0
   let weights = array<f32, 3>(0.38774, 0.24477, 0.06136);
   
   let offset = uniforms.direction * uniforms.texelSize;
@@ -56,6 +58,8 @@ ${fullscreenQuadVertex}
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // 9-tap ガウシアンブラー
+  // 重みはガウス分布（σ=2.0）を9サンプルで近似したもの
+  // 正規化済み: sum(weights) = 1.0
   let weights = array<f32, 5>(0.227027, 0.1945946, 0.1216216, 0.054054, 0.016216);
   
   let offset = uniforms.direction * uniforms.texelSize;

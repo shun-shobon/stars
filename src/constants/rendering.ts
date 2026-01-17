@@ -3,11 +3,6 @@
  */
 
 /**
- * ブルームのイテレーション回数
- */
-export const BLOOM_ITERATIONS = 5;
-
-/**
  * Uniform バッファサイズ
  */
 export const UNIFORM_BUFFER_SIZE = 64;
