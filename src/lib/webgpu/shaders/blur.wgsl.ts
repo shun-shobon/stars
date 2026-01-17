@@ -4,7 +4,44 @@
 
 import { fullscreenQuadVertex } from "./common";
 
-export const blurShaderCode = /* wgsl */ `
+/**
+ * 5-tap ガウシアンブラーシェーダー（モバイル向け最適化版）
+ */
+export const blur5TapShaderCode = /* wgsl */ `
+struct BlurUniforms {
+  direction: vec2f,  // (1,0) for horizontal, (0,1) for vertical
+  texelSize: vec2f,  // 1.0 / textureSize
+}
+
+@group(0) @binding(0) var inputTexture: texture_2d<f32>;
+@group(0) @binding(1) var inputSampler: sampler;
+@group(0) @binding(2) var<uniform> uniforms: BlurUniforms;
+
+${fullscreenQuadVertex}
+
+@fragment
+fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
+  // 5-tap ガウシアンブラー（軽量版）
+  let weights = array<f32, 3>(0.38774, 0.24477, 0.06136);
+  
+  let offset = uniforms.direction * uniforms.texelSize;
+  
+  var result = textureSample(inputTexture, inputSampler, input.uv).rgb * weights[0];
+  
+  for (var i = 1; i < 3; i++) {
+    let o = offset * f32(i) * 1.5;
+    result += textureSample(inputTexture, inputSampler, input.uv + o).rgb * weights[i];
+    result += textureSample(inputTexture, inputSampler, input.uv - o).rgb * weights[i];
+  }
+  
+  return vec4f(result, 1.0);
+}
+`;
+
+/**
+ * 9-tap ガウシアンブラーシェーダー（高品質版）
+ */
+export const blur9TapShaderCode = /* wgsl */ `
 struct BlurUniforms {
   direction: vec2f,  // (1,0) for horizontal, (0,1) for vertical
   texelSize: vec2f,  // 1.0 / textureSize
@@ -34,3 +71,6 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   return vec4f(result, 1.0);
 }
 `;
+
+// デフォルトは9-tap（後方互換性のため）
+export const blurShaderCode = blur9TapShaderCode;

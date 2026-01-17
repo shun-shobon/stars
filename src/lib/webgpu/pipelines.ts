@@ -4,7 +4,8 @@
 
 import {
 	backgroundShaderCode,
-	blurShaderCode,
+	blur5TapShaderCode,
+	blur9TapShaderCode,
 	brightPassShaderCode,
 	compositeShaderCode,
 	silhouetteShaderCode,
@@ -20,13 +21,29 @@ export interface Pipelines {
 	silhouette: GPURenderPipeline;
 }
 
+export interface PipelineOptions {
+	/**
+	 * キャンバスのテクスチャフォーマット
+	 */
+	canvasFormat: GPUTextureFormat;
+	/**
+	 * レンダリングテクスチャのフォーマット
+	 */
+	renderTextureFormat: GPUTextureFormat;
+	/**
+	 * ブラーのタップ数
+	 */
+	blurTaps: 5 | 9;
+}
+
 /**
  * 全パイプラインを作成
  */
 export function createPipelines(
 	device: GPUDevice,
-	format: GPUTextureFormat,
+	options: PipelineOptions,
 ): Pipelines {
+	const { canvasFormat, renderTextureFormat, blurTaps } = options;
 	// 背景（光害グラデーション）パイプライン
 	const backgroundModule = device.createShaderModule({
 		label: "Background shader",
@@ -43,7 +60,7 @@ export function createPipelines(
 		fragment: {
 			module: backgroundModule,
 			entryPoint: "fragmentMain",
-			targets: [{ format: "rgba16float" }],
+			targets: [{ format: renderTextureFormat }],
 		},
 		primitive: {
 			topology: "triangle-list",
@@ -75,7 +92,7 @@ export function createPipelines(
 			entryPoint: "fragmentMain",
 			targets: [
 				{
-					format: "rgba16float",
+					format: renderTextureFormat,
 					blend: {
 						color: {
 							srcFactor: "src-alpha",
@@ -112,14 +129,16 @@ export function createPipelines(
 		fragment: {
 			module: brightPassModule,
 			entryPoint: "fragmentMain",
-			targets: [{ format: "rgba16float" }],
+			targets: [{ format: renderTextureFormat }],
 		},
 		primitive: {
 			topology: "triangle-list",
 		},
 	});
 
-	// ブラーパイプライン
+	// ブラーパイプライン（タップ数に応じて選択）
+	const blurShaderCode =
+		blurTaps === 5 ? blur5TapShaderCode : blur9TapShaderCode;
 	const blurModule = device.createShaderModule({
 		label: "Blur shader",
 		code: blurShaderCode,
@@ -135,7 +154,7 @@ export function createPipelines(
 		fragment: {
 			module: blurModule,
 			entryPoint: "fragmentMain",
-			targets: [{ format: "rgba16float" }],
+			targets: [{ format: renderTextureFormat }],
 		},
 		primitive: {
 			topology: "triangle-list",
@@ -158,7 +177,7 @@ export function createPipelines(
 		fragment: {
 			module: compositeModule,
 			entryPoint: "fragmentMain",
-			targets: [{ format }],
+			targets: [{ format: canvasFormat }],
 		},
 		primitive: {
 			topology: "triangle-list",
@@ -181,7 +200,7 @@ export function createPipelines(
 		fragment: {
 			module: silhouetteModule,
 			entryPoint: "fragmentMain",
-			targets: [{ format }],
+			targets: [{ format: canvasFormat }],
 		},
 		primitive: {
 			topology: "triangle-list",

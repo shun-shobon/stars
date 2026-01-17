@@ -2,8 +2,6 @@
  * ブルーム効果処理
  */
 
-import { BLOOM_ITERATIONS } from "~/constants";
-
 import type { Pipelines } from "./pipelines";
 import type { RenderTextures } from "./textures";
 
@@ -30,9 +28,10 @@ export function createBlurResources(
 	pipelines: Pipelines,
 	textures: RenderTextures,
 	sampler: GPUSampler,
+	bloomDownscale: number,
 ): BlurResources {
-	const bloomWidth = Math.floor(textures.width / 2);
-	const bloomHeight = Math.floor(textures.height / 2);
+	const bloomWidth = Math.floor(textures.width / bloomDownscale);
+	const bloomHeight = Math.floor(textures.height / bloomDownscale);
 	const texelSize = [1 / bloomWidth, 1 / bloomHeight];
 
 	const uniformBuffers: GPUBuffer[] = [];
@@ -172,8 +171,9 @@ export function encodeBlurPasses(
 	pipelines: Pipelines,
 	textures: RenderTextures,
 	blurResources: BlurResources,
+	iterations: number,
 ): void {
-	for (let i = 0; i < BLOOM_ITERATIONS; i += 1) {
+	for (let i = 0; i < iterations; i += 1) {
 		// 水平ブラー (bloom[0] -> bloom[1])
 		const hBlurPass = commandEncoder.beginRenderPass({
 			colorAttachments: [

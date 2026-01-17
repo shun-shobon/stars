@@ -10,6 +10,8 @@ import {
 } from "~/constants";
 import starsMeta from "~/data/stars-meta.json";
 import { calculateLocalSiderealTime } from "~/lib/astronomy";
+import type { PerformanceProfile } from "~/lib/device";
+import { getPerformanceProfile } from "~/lib/device";
 
 import type { BlurResources, PostProcessBindGroups } from "./bloom";
 import {
@@ -18,9 +20,9 @@ import {
 	destroyBlurResources,
 	encodeBlurPasses,
 } from "./bloom";
-import type { Pipelines } from "./pipelines";
+import type { PipelineOptions, Pipelines } from "./pipelines";
 import { createPipelines } from "./pipelines";
-import type { RenderTextures } from "./textures";
+import type { RenderTextures, TextureOptions } from "./textures";
 import { createRenderTextures, destroyRenderTextures } from "./textures";
 import type { CameraState, LoadProgressCallback, StarfieldMeta } from "./types";
 
@@ -30,7 +32,8 @@ export type { CameraState, LoadProgressCallback, StarfieldMeta } from "./types";
 export class StarfieldRenderer {
 	private device: GPUDevice | null = null;
 	private context: GPUCanvasContext | null = null;
-	private format: GPUTextureFormat = "bgra8unorm";
+	private canvasFormat: GPUTextureFormat = "bgra8unorm";
+	private readonly performanceProfile: PerformanceProfile;
 
 	private pipelines: Pipelines | null = null;
 	private starBuffer: GPUBuffer | null = null;
@@ -46,6 +49,10 @@ export class StarfieldRenderer {
 	private loadedStarCount = 0;
 	private meta: StarfieldMeta | null = null;
 	private canvas: HTMLCanvasElement | null = null;
+
+	constructor(profile?: PerformanceProfile) {
+		this.performanceProfile = profile ?? getPerformanceProfile();
+	}
 
 	async init(canvas: HTMLCanvasElement): Promise<void> {
 		this.canvas = canvas;
@@ -67,10 +74,10 @@ export class StarfieldRenderer {
 			throw new Error("WebGPUコンテキストの取得に失敗しました");
 		}
 
-		this.format = navigator.gpu.getPreferredCanvasFormat();
+		this.canvasFormat = navigator.gpu.getPreferredCanvasFormat();
 		this.context.configure({
 			device: this.device,
-			format: this.format,
+			format: this.canvasFormat,
 			alphaMode: "opaque",
 		});
 
@@ -82,8 +89,13 @@ export class StarfieldRenderer {
 			addressModeV: "clamp-to-edge",
 		});
 
-		// パイプライン作成
-		this.pipelines = createPipelines(this.device, this.format);
+		// パイプライン作成（パフォーマンスプロファイルに基づく）
+		const pipelineOptions: PipelineOptions = {
+			canvasFormat: this.canvasFormat,
+			renderTextureFormat: this.performanceProfile.textureFormat,
+			blurTaps: this.performanceProfile.blurTaps,
+		};
+		this.pipelines = createPipelines(this.device, pipelineOptions);
 
 		// Uniform buffer作成
 		this.uniformBuffer = this.device.createBuffer({
@@ -103,13 +115,23 @@ export class StarfieldRenderer {
 		destroyRenderTextures(this.textures);
 		destroyBlurResources(this.blurResources);
 
-		// 新しいリソースを作成
-		this.textures = createRenderTextures(this.device, width, height);
+		// 新しいリソースを作成（パフォーマンスプロファイルに基づく）
+		const textureOptions: TextureOptions = {
+			format: this.performanceProfile.textureFormat,
+			bloomDownscale: this.performanceProfile.bloomDownscale,
+		};
+		this.textures = createRenderTextures(
+			this.device,
+			width,
+			height,
+			textureOptions,
+		);
 		this.blurResources = createBlurResources(
 			this.device,
 			this.pipelines,
 			this.textures,
 			this.sampler,
+			this.performanceProfile.bloomDownscale,
 		);
 		this.postProcessBindGroups = createPostProcessBindGroups(
 			this.device,
@@ -126,7 +148,11 @@ export class StarfieldRenderer {
 
 		// メタデータ（importから取得）
 		this.meta = starsMeta;
-		this.starCount = this.meta.starCount;
+		// パフォーマンスプロファイルに基づいて星の数を制限
+		this.starCount = Math.min(
+			this.meta.starCount,
+			this.performanceProfile.maxStars,
+		);
 
 		const totalBytes = this.starCount * BYTES_PER_STAR;
 
@@ -248,7 +274,11 @@ export class StarfieldRenderer {
 		uniformData[4] = TOKYO_LATITUDE_RAD;
 		uniformData[5] = lst;
 		uniformData[6] = this.meta.minMagnitude;
-		uniformData[7] = this.meta.maxMagnitude;
+		// パフォーマンスプロファイルに基づいて最大等級を制限
+		uniformData[7] = Math.min(
+			this.meta.maxMagnitude,
+			this.performanceProfile.maxMagnitude,
+		);
 
 		this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
 
@@ -352,12 +382,13 @@ export class StarfieldRenderer {
 		brightPass.draw(6);
 		brightPass.end();
 
-		// Pass 4-5: ガウシアンブラー
+		// Pass 4-5: ガウシアンブラー（パフォーマンスプロファイルに基づくイテレーション数）
 		encodeBlurPasses(
 			commandEncoder,
 			this.pipelines!,
 			this.textures!,
 			this.blurResources!,
+			this.performanceProfile.bloomIterations,
 		);
 
 		// Pass 6: 最終合成（シーン + ブルーム -> 画面）
