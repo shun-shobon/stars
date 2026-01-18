@@ -52,8 +52,8 @@ importers:
         specifier: 5.1.2
         version: 5.1.2(vite@7.3.1(@types/node@24.10.8)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0))
       '@webgpu/types':
-        specifier: 0.1.68
-        version: 0.1.68
+        specifier: 0.1.69
+        version: 0.1.69
       babel-plugin-react-compiler:
         specifier: 1.0.0
         version: 1.0.0
@@ -1417,8 +1417,8 @@ packages:
   '@vitest/utils@3.2.4':
     resolution: {integrity: sha512-fB2V0JFrQSMsCo9HiSq3Ezpdv4iYaXRG1Sx8edX3MwxfyNn83mKiGzOcH+Fkxt4MHxr3y42fQi1oeAInqgX2QA==}
 
-  '@webgpu/types@0.1.68':
-    resolution: {integrity: sha512-3ab1B59Ojb6RwjOspYLsTpCzbNB3ZaamIAxBMmvnNkiDoLTZUOBXZ9p5nAYVEkQlDdf6qAZWi1pqj9+ypiqznA==}
+  '@webgpu/types@0.1.69':
+    resolution: {integrity: sha512-RPmm6kgRbI8e98zSD3RVACvnuktIja5+yLgDAkTmxLr90BEwdTXRQWNLF3ETTTyH/8mKhznZuN5AveXYFEsMGQ==}
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -4476,7 +4476,7 @@ snapshots:
       loupe: 3.2.1
       tinyrainbow: 2.0.0
 
-  '@webgpu/types@0.1.68': {}
+  '@webgpu/types@0.1.69': {}
 
   acorn-jsx@5.3.2(acorn@8.15.0):
     dependencies:
