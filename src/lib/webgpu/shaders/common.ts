@@ -24,8 +24,14 @@ fn cartesianToHorizontal(dir: vec3f) -> vec2f {
   return vec2f(az, alt);
 }
 
-// UV座標から視線方向（方位角・高度）を計算
-fn uvToHorizontal(uv: vec2f, viewAz: f32, viewAlt: f32, fov: f32, aspect: f32) -> vec2f {
+// FOVに応じたカメラオフセットを計算
+fn calculateCameraOffset(fov: f32, minFov: f32, maxFov: f32, maxOffset: f32) -> f32 {
+  let t = clamp((fov - minFov) / (maxFov - minFov), 0.0, 1.0);
+  return maxOffset * t;
+}
+
+// UV座標から視線方向（方位角・高度）を計算（カメラオフセット対応）
+fn uvToHorizontal(uv: vec2f, viewAz: f32, viewAlt: f32, fov: f32, aspect: f32, minFov: f32, maxFov: f32, maxCameraOffset: f32) -> vec2f {
   // NDC座標 (-1 to 1)
   let ndcX = (uv.x - 0.5) * 2.0;
   let ndcY = (0.5 - uv.y) * 2.0;  // Y軸反転（上が正）
@@ -52,11 +58,32 @@ fn uvToHorizontal(uv: vec2f, viewAz: f32, viewAlt: f32, fov: f32, aspect: f32) -
   
   let up = normalize(cross(viewDir, right));
   
-  // 視線座標系からワールド座標系への変換
-  let worldDir = normalize(right * viewX + up * viewY + viewDir * viewZ);
+  // 視線座標系からワールド座標系への変換（カメラ位置からの方向）
+  let rayDir = normalize(right * viewX + up * viewY + viewDir * viewZ);
+  
+  // FOVに応じたカメラオフセットを計算
+  let cameraOffset = calculateCameraOffset(fov, minFov, maxFov, maxCameraOffset);
+  let cameraPos = -viewDir * cameraOffset;
+  
+  // カメラ位置からrayDir方向に伸ばした直線と単位球の交点を求める
+  // |cameraPos + t * rayDir| = 1 を解く
+  // t^2 + 2*(cameraPos・rayDir)*t + (|cameraPos|^2 - 1) = 0
+  let a = 1.0;  // |rayDir|^2 = 1
+  let b = 2.0 * dot(cameraPos, rayDir);
+  let c = dot(cameraPos, cameraPos) - 1.0;
+  let discriminant = b * b - 4.0 * a * c;
+  
+  if (discriminant < 0.0) {
+    // 交点なし（通常は起こらない）
+    return cartesianToHorizontal(rayDir);
+  }
+  
+  // 正の解（カメラの前方の交点）を選択
+  let t = (-b + sqrt(discriminant)) / (2.0 * a);
+  let intersectionPoint = cameraPos + rayDir * t;
   
   // ワールド座標系から方位角・高度を計算
-  return cartesianToHorizontal(worldDir);
+  return cartesianToHorizontal(normalize(intersectionPoint));
 }
 `;
 

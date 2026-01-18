@@ -96,9 +96,9 @@ export function createPostProcessBindGroups(
 	sampler: GPUSampler,
 	skylineResources: SkylineResources,
 ): PostProcessBindGroups {
-	// 背景用uniformバッファ（カメラ情報：altitude, fov, aspect, azimuth）
+	// 背景用uniformバッファ（カメラ情報：altitude, fov, aspect, azimuth, minFov, maxFov, maxCameraOffset, padding）
 	const backgroundUniformBuffer = device.createBuffer({
-		size: 16, // 4 floats
+		size: 32, // 8 floats
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	});
 
@@ -140,9 +140,9 @@ export function createPostProcessBindGroups(
 		],
 	});
 
-	// シルエット用uniformバッファ（カメラ情報：altitude, fov, aspect, azimuth）
+	// シルエット用uniformバッファ（カメラ情報：altitude, fov, aspect, azimuth, minFov, maxFov, maxCameraOffset, padding）
 	const silhouetteUniformBuffer = device.createBuffer({
-		size: 16, // 4 floats
+		size: 32, // 8 floats
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	});
 

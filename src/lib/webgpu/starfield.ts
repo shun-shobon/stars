@@ -10,6 +10,9 @@ import {
 	CONSTELLATION_LINE_ALPHA,
 	CONSTELLATION_LINE_WIDTH,
 	CONSTELLATION_UNIFORM_SIZE,
+	MAX_CAMERA_OFFSET,
+	MAX_FOV,
+	MIN_FOV,
 	TOKYO_LATITUDE_RAD,
 	TOKYO_LONGITUDE,
 	UNIFORM_BUFFER_SIZE,
@@ -414,7 +417,8 @@ export class StarfieldRenderer {
 
 		const lst = calculateLocalSiderealTime(time, TOKYO_LONGITUDE);
 
-		const uniformData = new Float32Array(16);
+		// 星シェーダー用Uniform（12 floats）
+		const uniformData = new Float32Array(12);
 		uniformData[0] = camera.azimuth;
 		uniformData[1] = camera.altitude;
 		uniformData[2] = camera.fov;
@@ -423,15 +427,24 @@ export class StarfieldRenderer {
 		uniformData[5] = lst;
 		uniformData[6] = this.meta.minMagnitude;
 		uniformData[7] = this.meta.maxMagnitude;
+		uniformData[8] = MIN_FOV;
+		uniformData[9] = MAX_FOV;
+		uniformData[10] = MAX_CAMERA_OFFSET;
+		uniformData[11] = 0; // padding
 
 		this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
 
 		// 共通のカメラuniformデータ（background, composite, silhouette用）
-		const cameraUniformData = new Float32Array(4);
+		// 8 floats: altitude, fov, aspect, azimuth, minFov, maxFov, maxCameraOffset, padding
+		const cameraUniformData = new Float32Array(8);
 		cameraUniformData[0] = camera.altitude; // 視線の高度角
 		cameraUniformData[1] = camera.fov; // 視野角
 		cameraUniformData[2] = this.canvas.width / this.canvas.height; // アスペクト比
-		cameraUniformData[3] = camera.azimuth; // 方位角（silhouette用）
+		cameraUniformData[3] = camera.azimuth; // 方位角
+		cameraUniformData[4] = MIN_FOV; // 最小視野角
+		cameraUniformData[5] = MAX_FOV; // 最大視野角
+		cameraUniformData[6] = MAX_CAMERA_OFFSET; // カメラオフセット最大値
+		cameraUniformData[7] = 0; // padding
 
 		// background用のカメラuniform更新
 		if (this.postProcessBindGroups?.backgroundUniformBuffer) {
@@ -476,7 +489,7 @@ export class StarfieldRenderer {
 
 		// 星座線用uniform更新
 		if (this.constellationUniformBuffer) {
-			const constellationUniformData = new Float32Array(8);
+			const constellationUniformData = new Float32Array(12);
 			constellationUniformData[0] = camera.azimuth;
 			constellationUniformData[1] = camera.altitude;
 			constellationUniformData[2] = camera.fov;
@@ -485,6 +498,10 @@ export class StarfieldRenderer {
 			constellationUniformData[5] = lst;
 			constellationUniformData[6] = CONSTELLATION_LINE_WIDTH;
 			constellationUniformData[7] = CONSTELLATION_LINE_ALPHA;
+			constellationUniformData[8] = MIN_FOV;
+			constellationUniformData[9] = MAX_FOV;
+			constellationUniformData[10] = MAX_CAMERA_OFFSET;
+			constellationUniformData[11] = 0; // padding
 			this.device.queue.writeBuffer(
 				this.constellationUniformBuffer,
 				0,
