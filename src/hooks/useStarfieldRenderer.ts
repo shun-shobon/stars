@@ -14,6 +14,7 @@ import {
 	rendererAtom,
 	showConstellationsAtom,
 } from "~/atoms";
+import { AUTO_ROTATE_SPEED } from "~/constants";
 import { store } from "~/lib/store";
 import { StarfieldRenderer } from "~/lib/webgpu/starfield";
 
@@ -32,6 +33,7 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 
 	// Jotai atoms - renderer state
 	const [renderer, setRenderer] = useAtom(rendererAtom);
+	const setCamera = useSetAtom(cameraAtom);
 	const setIsLoading = useSetAtom(isLoadingAtom);
 	const setLoadingProgress = useSetAtom(loadingProgressAtom);
 	const setError = useSetAtom(errorAtom);
@@ -47,6 +49,7 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 		handleTouchStart,
 		handleTouchMove,
 		handleTouchEnd,
+		isInteractingRef,
 	} = useCameraControls({ canvasRef });
 
 	// 進捗コールバック
@@ -123,7 +126,23 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 	useEffect(() => {
 		if (!renderer || error) return;
 
+		let lastTime = performance.now();
+
 		const render = (): void => {
+			const now = performance.now();
+			const deltaTime = (now - lastTime) / 1000; // 秒に変換
+			lastTime = now;
+
+			// 操作していないときは自動回転
+			if (!isInteractingRef.current) {
+				setCamera((prev) => {
+					let newAzimuth = prev.azimuth + AUTO_ROTATE_SPEED * deltaTime;
+					// 0-2π に正規化
+					while (newAzimuth >= Math.PI * 2) newAzimuth -= Math.PI * 2;
+					return { ...prev, azimuth: newAzimuth };
+				});
+			}
+
 			const camera = store.get(cameraAtom);
 			const currentTime = store.get(currentTimeAtom);
 
@@ -136,7 +155,7 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 		return () => {
 			cancelAnimationFrame(animationFrameRef.current);
 		};
-	}, [renderer, error]);
+	}, [renderer, error, isInteractingRef]);
 
 	return {
 		canvasRef,

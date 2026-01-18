@@ -29,6 +29,7 @@ export interface UseCameraControlsResult {
 	handleTouchStart: (e: TouchEvent) => void;
 	handleTouchMove: (e: TouchEvent) => void;
 	handleTouchEnd: (e: TouchEvent) => void;
+	isInteractingRef: React.RefObject<boolean>;
 }
 
 /**
@@ -85,10 +86,12 @@ export function useCameraControls({
 	const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 	const isPinchingRef = useRef(false);
 	const lastPinchDistanceRef = useRef(0);
+	const isInteractingRef = useRef(false);
 
 	// マウスイベントハンドラー
 	const handleMouseDown = useCallback((e: MouseEvent) => {
 		isDraggingRef.current = true;
+		isInteractingRef.current = true;
 		lastMouseRef.current = { x: e.clientX, y: e.clientY };
 	}, []);
 
@@ -107,6 +110,7 @@ export function useCameraControls({
 
 	const handleMouseUp = useCallback(() => {
 		isDraggingRef.current = false;
+		isInteractingRef.current = false;
 	}, []);
 
 	// ホイールでズーム
@@ -130,6 +134,7 @@ export function useCameraControls({
 			if (touch) {
 				isDraggingRef.current = true;
 				isPinchingRef.current = false;
+				isInteractingRef.current = true;
 				touchStartRef.current = { x: touch.clientX, y: touch.clientY };
 				lastMouseRef.current = { x: touch.clientX, y: touch.clientY };
 			}
@@ -140,6 +145,7 @@ export function useCameraControls({
 			if (touch1 && touch2) {
 				isDraggingRef.current = false;
 				isPinchingRef.current = true;
+				isInteractingRef.current = true;
 				lastPinchDistanceRef.current = getTouchDistance(touch1, touch2);
 			}
 		}
@@ -185,6 +191,7 @@ export function useCameraControls({
 			// すべての指が離れた
 			isDraggingRef.current = false;
 			isPinchingRef.current = false;
+			isInteractingRef.current = false;
 			touchStartRef.current = null;
 			lastPinchDistanceRef.current = 0;
 		} else if (e.touches.length === 1) {
@@ -193,6 +200,7 @@ export function useCameraControls({
 			if (touch) {
 				isDraggingRef.current = true;
 				isPinchingRef.current = false;
+				isInteractingRef.current = true;
 				lastMouseRef.current = { x: touch.clientX, y: touch.clientY };
 			}
 		}
@@ -206,5 +214,6 @@ export function useCameraControls({
 		handleTouchStart,
 		handleTouchMove,
 		handleTouchEnd,
+		isInteractingRef,
 	};
 }

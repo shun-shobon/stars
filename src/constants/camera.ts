@@ -57,3 +57,8 @@ export const MAX_ALTITUDE = Math.PI / 2 - 0.1;
  * 広角時に全天球を見渡しやすくするための設定
  */
 export const MAX_CAMERA_OFFSET = 0.5;
+
+/**
+ * 自動回転速度（ラジアン/秒） 1周（2π）を約2分で回転
+ */
+export const AUTO_ROTATE_SPEED = Math.PI / 60;
