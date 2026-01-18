@@ -442,21 +442,20 @@ export class StarfieldRenderer {
 		// 注: カメラオフセット機能は現在のシェーダー最適化により省略されています
 		// 将来的に必要であれば、uniformに追加することで対応可能です
 
-		let right = {
+		const rightTemp = {
 			x: viewDir.z,
 			y: 0,
 			z: -viewDir.x,
 		};
-		const rightLength = Math.hypot(right.x, right.y, right.z);
-		if (rightLength < 0.001) {
-			right = { x: 1, y: 0, z: 0 };
-		} else {
-			right = {
-				x: right.x / rightLength,
-				y: right.y / rightLength,
-				z: right.z / rightLength,
-			};
-		}
+		const rightLength = Math.hypot(rightTemp.x, rightTemp.y, rightTemp.z);
+		const right =
+			rightLength < 0.001
+				? { x: 1, y: 0, z: 0 }
+				: {
+						x: rightTemp.x / rightLength,
+						y: rightTemp.y / rightLength,
+						z: rightTemp.z / rightLength,
+					};
 
 		const up = {
 			x: viewDir.y * right.z - viewDir.z * right.y,
