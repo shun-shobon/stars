@@ -26,10 +26,32 @@ import type { SkylineResources } from "./skyline";
 import { createSkylineTexture, destroySkylineTexture } from "./skyline";
 import type { RenderTextures } from "./textures";
 import { createRenderTextures, destroyRenderTextures } from "./textures";
-import type { CameraState, LoadProgressCallback, StarfieldMeta } from "./types";
+import type {
+	CameraState,
+	HdrConfig,
+	LoadProgressCallback,
+	StarfieldMeta,
+} from "./types";
 
 // 型を再エクスポート
-export type { CameraState, LoadProgressCallback, StarfieldMeta } from "./types";
+export type {
+	CameraState,
+	HdrConfig,
+	LoadProgressCallback,
+	StarfieldMeta,
+} from "./types";
+
+/**
+ * HDR対応を検出する
+ */
+function detectHdrSupport(): boolean {
+	// CSS Media Query で HDR ディスプレイを検出
+	// eslint-disable-next-line typescript/no-unnecessary-condition -- matchMedia may be undefined in some environments
+	if (globalThis.matchMedia) {
+		return globalThis.matchMedia("(dynamic-range: high)").matches;
+	}
+	return false;
+}
 
 export class StarfieldRenderer {
 	private device: GPUDevice | null = null;
@@ -52,6 +74,11 @@ export class StarfieldRenderer {
 	private meta: StarfieldMeta | null = null;
 	private canvas: HTMLCanvasElement | null = null;
 
+	private hdrConfig: HdrConfig = {
+		enabled: false,
+		toneMappingMode: 0,
+	};
+
 	async init(canvas: HTMLCanvasElement): Promise<void> {
 		this.canvas = canvas;
 
@@ -73,11 +100,12 @@ export class StarfieldRenderer {
 		}
 
 		this.format = navigator.gpu.getPreferredCanvasFormat();
-		this.context.configure({
-			device: this.device,
-			format: this.format,
-			alphaMode: "opaque",
-		});
+
+		// HDR対応を試行
+		this.hdrConfig = this.configureCanvasWithHdr();
+
+		// HDR有効時はキャンバスフォーマットを更新
+		const canvasFormat = this.hdrConfig.enabled ? "rgba16float" : this.format;
 
 		// サンプラー作成
 		this.sampler = this.device.createSampler({
@@ -88,7 +116,7 @@ export class StarfieldRenderer {
 		});
 
 		// パイプライン作成
-		this.pipelines = createPipelines(this.device, this.format);
+		this.pipelines = createPipelines(this.device, canvasFormat);
 
 		// スカイラインテクスチャ作成（建物シルエット用）
 		this.skylineResources = createSkylineTexture(this.device);
@@ -98,6 +126,53 @@ export class StarfieldRenderer {
 			size: UNIFORM_BUFFER_SIZE,
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
+	}
+
+	/**
+	 * HDR対応でキャンバスを設定する（失敗時はSDRにフォールバック）
+	 */
+	private configureCanvasWithHdr(): HdrConfig {
+		if (!this.device || !this.context) {
+			return { enabled: false, toneMappingMode: 0 };
+		}
+
+		const hasHdrDisplay = detectHdrSupport();
+
+		if (hasHdrDisplay) {
+			try {
+				// HDR設定を試行（rgba16float + extended toneMapping）
+				// WebGPU仕様では toneMapping: { mode: "extended" } でHDR出力可能
+				this.context.configure({
+					device: this.device,
+					format: "rgba16float",
+					alphaMode: "opaque",
+					colorSpace: "display-p3",
+					toneMapping: { mode: "extended" },
+				} as GPUCanvasConfiguration);
+
+				return { enabled: true, toneMappingMode: 1 };
+			} catch {
+				console.warn(
+					"HDR設定に失敗しました。SDRモードにフォールバックします。",
+				);
+			}
+		}
+
+		// SDRフォールバック
+		this.context.configure({
+			device: this.device,
+			format: this.format,
+			alphaMode: "opaque",
+		});
+
+		return { enabled: false, toneMappingMode: 0 };
+	}
+
+	/**
+	 * HDR設定を取得
+	 */
+	getHdrConfig(): HdrConfig {
+		return this.hdrConfig;
 	}
 
 	private recreateRenderTextures(): void {
@@ -305,6 +380,20 @@ export class StarfieldRenderer {
 				cameraUniformData,
 			);
 		}
+
+		// composite設定uniform更新（HDR/SDR切替）
+		if (this.postProcessBindGroups?.compositeSettingsBuffer) {
+			const compositeSettings = new Float32Array(4);
+			compositeSettings[0] = this.hdrConfig.toneMappingMode; // トーンマッピングモード
+			compositeSettings[1] = this.hdrConfig.enabled ? 1 : 1.2; // 露出（HDR時は低め）
+			compositeSettings[2] = this.hdrConfig.enabled ? 1.5 : 2; // ブルーム強度（HDR時は控えめ）
+			compositeSettings[3] = 0; // padding
+			this.device.queue.writeBuffer(
+				this.postProcessBindGroups.compositeSettingsBuffer,
+				0,
+				compositeSettings,
+			);
+		}
 	}
 
 	render(camera: CameraState, time: Date): void {
@@ -423,6 +512,7 @@ export class StarfieldRenderer {
 		this.uniformBuffer?.destroy();
 		this.postProcessBindGroups?.backgroundUniformBuffer.destroy();
 		this.postProcessBindGroups?.compositeUniformBuffer.destroy();
+		this.postProcessBindGroups?.compositeSettingsBuffer.destroy();
 		this.postProcessBindGroups?.silhouetteUniformBuffer.destroy();
 		destroyRenderTextures(this.textures);
 		destroyBlurResources(this.blurResources);

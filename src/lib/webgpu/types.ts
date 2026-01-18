@@ -29,3 +29,17 @@ export interface CameraState {
 	 */
 	fov: number;
 }
+
+/**
+ * HDR設定
+ */
+export interface HdrConfig {
+	/**
+	 * HDR出力が有効かどうか
+	 */
+	enabled: boolean;
+	/**
+	 * トーンマッピングモード（0: SDR Reinhard, 1: HDR リニア/軽量）
+	 */
+	toneMappingMode: number;
+}

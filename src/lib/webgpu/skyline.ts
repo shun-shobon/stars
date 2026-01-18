@@ -32,13 +32,12 @@ export const SKYLINE_LAYER_COUNT = 3;
 /**
  * 各レイヤーのパラメータ（遠景から前景へ）
  *
- * - azimuthOffset: 方位角オフセット（ラジアン）- 建物パターンをずらす
- * - heightScale: 高さの倍率（遠景は高め、前景は低め）
- * - probability: 建物密度（遠景は疎、前景は密）
- * - widthScale: 建物幅の倍率（遠景は細め、前景は太め）
+ * - AzimuthOffset: 方位角オフセット（ラジアン）- 建物パターンをずらす
+ * - HeightScale: 高さの倍率（遠景は高め、前景は低め）
+ * - Probability: 建物密度（遠景は疎、前景は密）
+ * - WidthScale: 建物幅の倍率（遠景は細め、前景は太め）
  *
- * 遠景の高い建物が前景の低い建物の上に見えることで、
- * レイヤー間の奥行き感を表現する
+ * 遠景の高い建物が前景の低い建物の上に見えることで、 レイヤー間の奥行き感を表現する
  */
 const LAYER_PARAMS = [
 	{ azimuthOffset: 0, heightScale: 1, probability: 0.25, widthScale: 0.7 }, // 遠景：疎で細い高層ビル

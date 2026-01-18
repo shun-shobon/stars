@@ -17,6 +17,7 @@ export interface PostProcessBindGroups {
 	brightPass: GPUBindGroup;
 	composite: GPUBindGroup;
 	compositeUniformBuffer: GPUBuffer;
+	compositeSettingsBuffer: GPUBuffer;
 	silhouette: GPUBindGroup;
 	silhouetteUniformBuffer: GPUBuffer;
 }
@@ -116,8 +117,14 @@ export function createPostProcessBindGroups(
 		],
 	});
 
-	// 合成用uniformバッファ（カメラ情報：altitude, fov, aspect, padding）
+	// 合成用uniformバッファ（カメラ情報：altitude, fov, aspect, padding）- 現在未使用だが互換性のため保持
 	const compositeUniformBuffer = device.createBuffer({
+		size: 16, // 4 floats
+		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+	});
+
+	// 合成設定用uniformバッファ（toneMappingMode, exposure, bloomStrength, padding）
+	const compositeSettingsBuffer = device.createBuffer({
 		size: 16, // 4 floats
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	});
@@ -129,6 +136,7 @@ export function createPostProcessBindGroups(
 			{ binding: 0, resource: textures.sceneView },
 			{ binding: 1, resource: textures.bloomViews[0]! },
 			{ binding: 2, resource: sampler },
+			{ binding: 3, resource: { buffer: compositeSettingsBuffer } },
 		],
 	});
 
@@ -154,6 +162,7 @@ export function createPostProcessBindGroups(
 		brightPass,
 		composite,
 		compositeUniformBuffer,
+		compositeSettingsBuffer,
 		silhouette,
 		silhouetteUniformBuffer,
 	};
