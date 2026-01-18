@@ -14,6 +14,7 @@ import {
 	rendererAtom,
 	showConstellationsAtom,
 } from "~/atoms";
+import { store } from "~/lib/store";
 import { StarfieldRenderer } from "~/lib/webgpu/starfield";
 
 import { useCameraControls } from "./useCameraControls";
@@ -35,10 +36,6 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 	const setLoadingProgress = useSetAtom(loadingProgressAtom);
 	const setError = useSetAtom(errorAtom);
 	const error = useAtomValue(errorAtom);
-
-	// Jotai atoms - camera & time
-	const camera = useAtomValue(cameraAtom);
-	const currentTime = useAtomValue(currentTimeAtom);
 	const showConstellations = useAtomValue(showConstellationsAtom);
 
 	// カメラ制御フック
@@ -127,6 +124,9 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 		if (!renderer || error) return;
 
 		const render = (): void => {
+			const camera = store.get(cameraAtom);
+			const currentTime = store.get(currentTimeAtom);
+
 			renderer.render(camera, currentTime);
 			animationFrameRef.current = requestAnimationFrame(render);
 		};
@@ -136,7 +136,7 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 		return () => {
 			cancelAnimationFrame(animationFrameRef.current);
 		};
-	}, [renderer, camera, currentTime, error]);
+	}, [renderer, error]);
 
 	return {
 		canvasRef,
