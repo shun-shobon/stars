@@ -18,9 +18,9 @@ export const BLOOM_RESOLUTION_SCALE = 0.5;
 export const MAX_DEVICE_PIXEL_RATIO = 2;
 
 /**
- * Uniform バッファサイズ
+ * Uniform バッファサイズ（12 floats = 48 bytes、16バイトアライメントで48バイト）
  */
-export const UNIFORM_BUFFER_SIZE = 64;
+export const UNIFORM_BUFFER_SIZE = 48;
 
 /**
  * 1星あたりのバイト数（4 floats）
@@ -43,9 +43,9 @@ export const CONSTELLATION_LINE_WIDTH = 0.002;
 export const CONSTELLATION_LINE_ALPHA = 0.6;
 
 /**
- * 星座線用Uniformバッファサイズ（8 floats）
+ * 星座線用Uniformバッファサイズ（12 floats）
  */
-export const CONSTELLATION_UNIFORM_SIZE = 32;
+export const CONSTELLATION_UNIFORM_SIZE = 48;
 
 /**
  * 操作ヒントの表示時間（ミリ秒）

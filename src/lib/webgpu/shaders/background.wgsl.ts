@@ -8,10 +8,14 @@ export const backgroundShaderCode = /* wgsl */ `
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 
 struct CameraUniforms {
-  altitude: f32,     // 視線の高度角 (ラジアン)
-  fov: f32,          // 視野角 (ラジアン)
-  aspect: f32,       // アスペクト比
-  azimuth: f32,      // 方位角 (ラジアン)
+  altitude: f32,        // 視線の高度角 (ラジアン)
+  fov: f32,             // 視野角 (ラジアン)
+  aspect: f32,          // アスペクト比
+  azimuth: f32,         // 方位角 (ラジアン)
+  minFov: f32,          // 最小視野角
+  maxFov: f32,          // 最大視野角
+  maxCameraOffset: f32, // カメラオフセット最大値
+  padding: f32,         // 16バイトアライメント用パディング
 }
 
 ${inversePerspectiveFunctions}
@@ -53,8 +57,8 @@ fn calculateSkyglow(pixelAltitude: f32) -> vec3f {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  // UV座標から正確な高度を計算（透視投影の逆変換）
-  let horizontal = uvToHorizontal(input.uv, camera.azimuth, camera.altitude, camera.fov, camera.aspect);
+  // UV座標から正確な高度を計算（透視投影の逆変換、カメラオフセット対応）
+  let horizontal = uvToHorizontal(input.uv, camera.azimuth, camera.altitude, camera.fov, camera.aspect, camera.minFov, camera.maxFov, camera.maxCameraOffset);
   let pixelAltitude = horizontal.y;
   
   // 街明かりの光害を計算

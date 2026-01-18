@@ -17,10 +17,14 @@ export const silhouetteShaderCode = /* wgsl */ `
 @group(0) @binding(1) var skylineTexture: texture_2d<f32>;
 
 struct CameraUniforms {
-  altitude: f32,     // 視線の高度角 (ラジアン)
-  fov: f32,          // 視野角 (ラジアン)
-  aspect: f32,       // アスペクト比
-  azimuth: f32,      // 方位角 (ラジアン)
+  altitude: f32,        // 視線の高度角 (ラジアン)
+  fov: f32,             // 視野角 (ラジアン)
+  aspect: f32,          // アスペクト比
+  azimuth: f32,         // 方位角 (ラジアン)
+  minFov: f32,          // 最小視野角
+  maxFov: f32,          // 最大視野角
+  maxCameraOffset: f32, // カメラオフセット最大値
+  padding: f32,         // 16バイトアライメント用パディング
 }
 
 const TWO_PI: f32 = 6.28318530718;
@@ -60,8 +64,8 @@ fn getSkylineHeight(azimuth: f32, layer: u32) -> f32 {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  // UV座標から正確な方位角・高度を計算（透視投影の逆変換）
-  let horizontal = uvToHorizontal(input.uv, camera.azimuth, camera.altitude, camera.fov, camera.aspect);
+  // UV座標から正確な方位角・高度を計算（透視投影の逆変換、カメラオフセット対応）
+  let horizontal = uvToHorizontal(input.uv, camera.azimuth, camera.altitude, camera.fov, camera.aspect, camera.minFov, camera.maxFov, camera.maxCameraOffset);
   let pixelAzimuth = horizontal.x;
   let pixelAltitude = horizontal.y;
   

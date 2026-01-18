@@ -51,3 +51,9 @@ export const MIN_ALTITUDE = -Math.PI / 2 + 0.1;
  * 最大高度角（ラジアン）- 天頂の少し下
  */
 export const MAX_ALTITUDE = Math.PI / 2 - 0.1;
+
+/**
+ * カメラオフセットの最大値（天球半径 = 1.0 に対する比率） FOVが最大のとき、この値だけ視線方向の逆方向にオフセット
+ * 広角時に全天球を見渡しやすくするための設定
+ */
+export const MAX_CAMERA_OFFSET = 0.5;
