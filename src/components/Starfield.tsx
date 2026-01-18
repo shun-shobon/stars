@@ -26,6 +26,8 @@ const Starfield: FC = () => {
 		currentTime,
 		setCurrentTime,
 		setRealtimeMode,
+		showConstellations,
+		setShowConstellations,
 	} = useStarfield();
 
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -66,6 +68,11 @@ const Starfield: FC = () => {
 	const handleDatePickerToggle = useCallback((): void => {
 		setIsDatePickerOpen((prev) => !prev);
 	}, []);
+
+	// 星座線トグル
+	const handleToggleConstellations = useCallback((): void => {
+		setShowConstellations(!showConstellations);
+	}, [showConstellations, setShowConstellations]);
 
 	// キャンバスサイズをウィンドウに合わせる（DPR上限を適用）
 	useEffect(() => {
@@ -118,7 +125,12 @@ const Starfield: FC = () => {
 			/>
 
 			{/* フッターパネル */}
-			<StarfieldFooter direction={direction} altitude={altitude} />
+			<StarfieldFooter
+				direction={direction}
+				altitude={altitude}
+				showConstellations={showConstellations}
+				onToggleConstellations={handleToggleConstellations}
+			/>
 
 			{/* 操作ヒント */}
 			{showHints && <StarfieldHints />}

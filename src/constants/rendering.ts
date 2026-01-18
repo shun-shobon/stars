@@ -28,6 +28,26 @@ export const UNIFORM_BUFFER_SIZE = 64;
 export const BYTES_PER_STAR = 16;
 
 /**
+ * 1星座線あたりのバイト数（4 floats: ra1, dec1, ra2, dec2）
+ */
+export const BYTES_PER_CONSTELLATION_LINE = 16;
+
+/**
+ * 星座線の太さ（NDC単位）
+ */
+export const CONSTELLATION_LINE_WIDTH = 0.001;
+
+/**
+ * 星座線の透明度
+ */
+export const CONSTELLATION_LINE_ALPHA = 0.6;
+
+/**
+ * 星座線用Uniformバッファサイズ（8 floats）
+ */
+export const CONSTELLATION_UNIFORM_SIZE = 32;
+
+/**
  * 操作ヒントの表示時間（ミリ秒）
  */
 export const HINTS_DISPLAY_DURATION = 8000;

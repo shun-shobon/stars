@@ -23,6 +23,8 @@ export interface UseStarfieldResult {
 	setCurrentTime: (time: Date) => void;
 	isRealtimeMode: boolean;
 	setRealtimeMode: (enabled: boolean) => void;
+	showConstellations: boolean;
+	setShowConstellations: (visible: boolean) => void;
 }
 
 export function useStarfield(): UseStarfieldResult {
@@ -42,6 +44,7 @@ export function useStarfield(): UseStarfieldResult {
 	const [error, setError] = useState<string | null>(null);
 	const [currentTime, setCurrentTime] = useState(new Date());
 	const [isRealtimeMode, setRealtimeMode] = useState(true);
+	const [showConstellations, setShowConstellationsState] = useState(true);
 
 	// カメラ制御フック
 	const {
@@ -57,6 +60,12 @@ export function useStarfield(): UseStarfieldResult {
 	// 進捗コールバック
 	const handleProgress = useCallback((progress: number) => {
 		setLoadingProgress(progress);
+	}, []);
+
+	// 星座線表示切り替え
+	const setShowConstellations = useCallback((visible: boolean) => {
+		setShowConstellationsState(visible);
+		rendererRef.current?.setConstellationVisibility(visible);
 	}, []);
 
 	// 初期化
@@ -155,5 +164,7 @@ export function useStarfield(): UseStarfieldResult {
 		setCurrentTime,
 		isRealtimeMode,
 		setRealtimeMode,
+		showConstellations,
+		setShowConstellations,
 	};
 }

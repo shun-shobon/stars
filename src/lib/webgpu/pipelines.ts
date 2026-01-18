@@ -7,12 +7,14 @@ import {
 	blurShaderCode,
 	brightPassShaderCode,
 	compositeShaderCode,
+	constellationShaderCode,
 	silhouetteShaderCode,
 	starShaderCode,
 } from "./shaders";
 
 export interface Pipelines {
 	background: GPURenderPipeline;
+	constellation: GPURenderPipeline;
 	star: GPURenderPipeline;
 	brightPass: GPURenderPipeline;
 	blur: GPURenderPipeline;
@@ -44,6 +46,52 @@ export function createPipelines(
 			module: backgroundModule,
 			entryPoint: "fragmentMain",
 			targets: [{ format: "rgba16float" }],
+		},
+		primitive: {
+			topology: "triangle-list",
+		},
+	});
+
+	// 星座線パイプライン
+	const constellationShaderModule = device.createShaderModule({
+		label: "Constellation shader",
+		code: constellationShaderCode,
+	});
+
+	const constellation = device.createRenderPipeline({
+		label: "Constellation pipeline",
+		layout: "auto",
+		vertex: {
+			module: constellationShaderModule,
+			entryPoint: "vertexMain",
+			buffers: [
+				{
+					arrayStride: 16, // 4 floats (ra1, dec1, ra2, dec2)
+					stepMode: "instance",
+					attributes: [{ shaderLocation: 0, offset: 0, format: "float32x4" }],
+				},
+			],
+		},
+		fragment: {
+			module: constellationShaderModule,
+			entryPoint: "fragmentMain",
+			targets: [
+				{
+					format: "rgba16float",
+					blend: {
+						color: {
+							srcFactor: "src-alpha",
+							dstFactor: "one-minus-src-alpha",
+							operation: "add",
+						},
+						alpha: {
+							srcFactor: "one",
+							dstFactor: "one-minus-src-alpha",
+							operation: "add",
+						},
+					},
+				},
+			],
 		},
 		primitive: {
 			topology: "triangle-list",
@@ -188,5 +236,13 @@ export function createPipelines(
 		},
 	});
 
-	return { background, star, brightPass, blur, composite, silhouette };
+	return {
+		background,
+		constellation,
+		star,
+		brightPass,
+		blur,
+		composite,
+		silhouette,
+	};
 }

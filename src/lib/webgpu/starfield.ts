@@ -5,11 +5,16 @@
 import {
 	BLOOM_ITERATIONS,
 	BLOOM_RESOLUTION_SCALE,
+	BYTES_PER_CONSTELLATION_LINE,
 	BYTES_PER_STAR,
+	CONSTELLATION_LINE_ALPHA,
+	CONSTELLATION_LINE_WIDTH,
+	CONSTELLATION_UNIFORM_SIZE,
 	TOKYO_LATITUDE_RAD,
 	TOKYO_LONGITUDE,
 	UNIFORM_BUFFER_SIZE,
 } from "~/constants";
+import constellationsMeta from "~/data/constellations-meta.json";
 import starsMeta from "~/data/stars-meta.json";
 import { calculateLocalSiderealTime } from "~/lib/astronomy";
 
@@ -63,6 +68,13 @@ export class StarfieldRenderer {
 	private uniformBuffer: GPUBuffer | null = null;
 	private starBindGroup: GPUBindGroup | null = null;
 	private sampler: GPUSampler | null = null;
+
+	// 星座線リソース
+	private constellationBuffer: GPUBuffer | null = null;
+	private constellationUniformBuffer: GPUBuffer | null = null;
+	private constellationBindGroup: GPUBindGroup | null = null;
+	private constellationLineCount = 0;
+	private showConstellations = true;
 
 	private textures: RenderTextures | null = null;
 	private blurResources: BlurResources | null = null;
@@ -303,6 +315,73 @@ export class StarfieldRenderer {
 		if (onProgress) {
 			onProgress(100, this.loadedStarCount);
 		}
+
+		// 星座線データも読み込み
+		await this.loadConstellationData();
+	}
+
+	/**
+	 * 星座線データを読み込む
+	 */
+	private async loadConstellationData(): Promise<void> {
+		if (!this.device || !this.pipelines || !this.uniformBuffer) {
+			return;
+		}
+
+		this.constellationLineCount = constellationsMeta.lineCount;
+		const totalBytes =
+			this.constellationLineCount * BYTES_PER_CONSTELLATION_LINE;
+
+		// 星座線用Uniformバッファ作成
+		this.constellationUniformBuffer = this.device.createBuffer({
+			size: CONSTELLATION_UNIFORM_SIZE,
+			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+		});
+
+		// 星座線データバッファ作成
+		this.constellationBuffer = this.device.createBuffer({
+			size: totalBytes,
+			usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+		});
+
+		// 星座線用バインドグループ作成
+		this.constellationBindGroup = this.device.createBindGroup({
+			layout: this.pipelines.constellation.getBindGroupLayout(0),
+			entries: [
+				{
+					binding: 0,
+					resource: { buffer: this.constellationUniformBuffer },
+				},
+			],
+		});
+
+		// 星座線バイナリを読み込み
+		try {
+			const response = await fetch("/constellations.bin");
+			const arrayBuffer = await response.arrayBuffer();
+			this.device.queue.writeBuffer(
+				this.constellationBuffer,
+				0,
+				new Uint8Array(arrayBuffer),
+			);
+		} catch (error) {
+			console.warn("星座線データの読み込みに失敗しました:", error);
+			this.constellationLineCount = 0;
+		}
+	}
+
+	/**
+	 * 星座線の表示/非表示を設定
+	 */
+	setConstellationVisibility(visible: boolean): void {
+		this.showConstellations = visible;
+	}
+
+	/**
+	 * 星座線の表示状態を取得
+	 */
+	getConstellationVisibility(): boolean {
+		return this.showConstellations;
 	}
 
 	private isRenderReady(): boolean {
@@ -394,6 +473,24 @@ export class StarfieldRenderer {
 				compositeSettings,
 			);
 		}
+
+		// 星座線用uniform更新
+		if (this.constellationUniformBuffer) {
+			const constellationUniformData = new Float32Array(8);
+			constellationUniformData[0] = camera.azimuth;
+			constellationUniformData[1] = camera.altitude;
+			constellationUniformData[2] = camera.fov;
+			constellationUniformData[3] = this.canvas.width / this.canvas.height;
+			constellationUniformData[4] = TOKYO_LATITUDE_RAD;
+			constellationUniformData[5] = lst;
+			constellationUniformData[6] = CONSTELLATION_LINE_WIDTH;
+			constellationUniformData[7] = CONSTELLATION_LINE_ALPHA;
+			this.device.queue.writeBuffer(
+				this.constellationUniformBuffer,
+				0,
+				constellationUniformData,
+			);
+		}
 	}
 
 	render(camera: CameraState, time: Date): void {
@@ -428,6 +525,29 @@ export class StarfieldRenderer {
 		backgroundPass.setBindGroup(0, this.postProcessBindGroups!.background);
 		backgroundPass.draw(6);
 		backgroundPass.end();
+
+		// Pass 1.5: 星座線を描画（星の背後に表示）
+		if (
+			this.showConstellations &&
+			this.constellationBuffer &&
+			this.constellationBindGroup &&
+			this.constellationLineCount > 0
+		) {
+			const constellationPass = commandEncoder.beginRenderPass({
+				colorAttachments: [
+					{
+						view: this.textures!.sceneView,
+						loadOp: "load", // 背景を保持
+						storeOp: "store",
+					},
+				],
+			});
+			constellationPass.setPipeline(this.pipelines!.constellation);
+			constellationPass.setBindGroup(0, this.constellationBindGroup);
+			constellationPass.setVertexBuffer(0, this.constellationBuffer);
+			constellationPass.draw(6, this.constellationLineCount);
+			constellationPass.end();
+		}
 
 		// Pass 2: 星を加算ブレンドで背景の上に描画
 		const starPass = commandEncoder.beginRenderPass({
@@ -510,6 +630,8 @@ export class StarfieldRenderer {
 	dispose(): void {
 		this.starBuffer?.destroy();
 		this.uniformBuffer?.destroy();
+		this.constellationBuffer?.destroy();
+		this.constellationUniformBuffer?.destroy();
 		this.postProcessBindGroups?.backgroundUniformBuffer.destroy();
 		this.postProcessBindGroups?.compositeUniformBuffer.destroy();
 		this.postProcessBindGroups?.compositeSettingsBuffer.destroy();
