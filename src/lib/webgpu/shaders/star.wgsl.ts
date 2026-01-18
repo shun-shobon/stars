@@ -122,10 +122,7 @@ fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, as
   let screenX = (x / z) * scale / aspect;
   let screenY = (y / z) * scale;
   
-  // 視野の端に近い星は弱める
-  let w = cos(angularDist * 0.8);
-  
-  return vec4f(screenX, screenY, 0.5, w);
+  return vec4f(screenX, screenY, 0.5, 1.0);
 }
 
 // B-V色指数から星の色を計算 (黒体放射に基づく近似)
@@ -250,7 +247,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   );
   
   let vertexOffset = quadVertices[input.vertexIndex];
-  let size = baseSize * screenPos.w;
+  let size = baseSize;
   
   output.position = vec4f(
     screenPos.x + vertexOffset.x * size / uniforms.aspect,
@@ -260,7 +257,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   );
   
   output.uv = vertexOffset;
-  output.brightness = brightness * screenPos.w;
+  output.brightness = brightness;
   output.starColor = bvToColor(bv);
   
   return output;
