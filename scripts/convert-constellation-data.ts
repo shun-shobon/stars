@@ -27,7 +27,7 @@ interface OutputData {
 async function convertConstellationData(): Promise<void> {
 	const inputPath = path.resolve(
 		import.meta.dirname,
-		"../hip_constellation_line.csv",
+		"../data/hip_constellation_line.csv",
 	);
 	const outputPath = path.resolve(
 		import.meta.dirname,

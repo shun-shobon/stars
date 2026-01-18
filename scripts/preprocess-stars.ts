@@ -40,7 +40,7 @@ interface ConstellationLinesJson {
 async function processHipparcosData(): Promise<void> {
 	const inputPath = path.resolve(
 		import.meta.dirname,
-		"../hipparcos-voidmain.csv",
+		"../data/hipparcos-voidmain.csv",
 	);
 	const binaryOutputDir = path.resolve(import.meta.dirname, "../public");
 	const metaOutputDir = path.resolve(import.meta.dirname, "../src/data");
