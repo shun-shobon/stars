@@ -3,6 +3,7 @@
  */
 
 import type { Pipelines } from "./pipelines";
+import type { SkylineResources } from "./skyline";
 import type { RenderTextures } from "./textures";
 
 export interface BlurResources {
@@ -92,6 +93,7 @@ export function createPostProcessBindGroups(
 	pipelines: Pipelines,
 	textures: RenderTextures,
 	sampler: GPUSampler,
+	skylineResources: SkylineResources,
 ): PostProcessBindGroups {
 	// 背景用uniformバッファ（カメラ情報：altitude, fov, aspect, azimuth）
 	const backgroundUniformBuffer = device.createBuffer({
@@ -136,10 +138,14 @@ export function createPostProcessBindGroups(
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	});
 
-	// シルエット用バインドグループ
+	// シルエット用バインドグループ（スカイラインテクスチャを含む）
+	// r32floatはフィルタリング非対応のためtextureLoadを使用（サンプラー不要）
 	const silhouette = device.createBindGroup({
 		layout: pipelines.silhouette.getBindGroupLayout(0),
-		entries: [{ binding: 0, resource: { buffer: silhouetteUniformBuffer } }],
+		entries: [
+			{ binding: 0, resource: { buffer: silhouetteUniformBuffer } },
+			{ binding: 1, resource: skylineResources.textureView },
+		],
 	});
 
 	return {

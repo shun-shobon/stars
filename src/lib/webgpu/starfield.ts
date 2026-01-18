@@ -22,6 +22,8 @@ import {
 } from "./bloom";
 import type { Pipelines } from "./pipelines";
 import { createPipelines } from "./pipelines";
+import type { SkylineResources } from "./skyline";
+import { createSkylineTexture, destroySkylineTexture } from "./skyline";
 import type { RenderTextures } from "./textures";
 import { createRenderTextures, destroyRenderTextures } from "./textures";
 import type { CameraState, LoadProgressCallback, StarfieldMeta } from "./types";
@@ -43,6 +45,7 @@ export class StarfieldRenderer {
 	private textures: RenderTextures | null = null;
 	private blurResources: BlurResources | null = null;
 	private postProcessBindGroups: PostProcessBindGroups | null = null;
+	private skylineResources: SkylineResources | null = null;
 
 	private starCount = 0;
 	private loadedStarCount = 0;
@@ -87,6 +90,9 @@ export class StarfieldRenderer {
 		// パイプライン作成
 		this.pipelines = createPipelines(this.device, this.format);
 
+		// スカイラインテクスチャ作成（建物シルエット用）
+		this.skylineResources = createSkylineTexture(this.device);
+
 		// Uniform buffer作成
 		this.uniformBuffer = this.device.createBuffer({
 			size: UNIFORM_BUFFER_SIZE,
@@ -95,7 +101,13 @@ export class StarfieldRenderer {
 	}
 
 	private recreateRenderTextures(): void {
-		if (!this.device || !this.canvas || !this.pipelines || !this.sampler)
+		if (
+			!this.device ||
+			!this.canvas ||
+			!this.pipelines ||
+			!this.sampler ||
+			!this.skylineResources
+		)
 			return;
 
 		const width = this.canvas.width;
@@ -123,6 +135,7 @@ export class StarfieldRenderer {
 			this.pipelines,
 			this.textures,
 			this.sampler,
+			this.skylineResources,
 		);
 	}
 
@@ -413,6 +426,7 @@ export class StarfieldRenderer {
 		this.postProcessBindGroups?.silhouetteUniformBuffer.destroy();
 		destroyRenderTextures(this.textures);
 		destroyBlurResources(this.blurResources);
+		destroySkylineTexture(this.skylineResources);
 		this.device?.destroy();
 	}
 }
