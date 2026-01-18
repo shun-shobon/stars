@@ -5,7 +5,17 @@
 /**
  * ブルームのイテレーション回数
  */
-export const BLOOM_ITERATIONS = 5;
+export const BLOOM_ITERATIONS = 4;
+
+/**
+ * ブルームテクスチャの解像度スケール（1 = フル, 0.5 = 半分, 0.25 = 1/4）
+ */
+export const BLOOM_RESOLUTION_SCALE = 0.5;
+
+/**
+ * デバイスピクセル比の上限
+ */
+export const MAX_DEVICE_PIXEL_RATIO = 2;
 
 /**
  * Uniform バッファサイズ

@@ -3,6 +3,8 @@
  */
 
 import {
+	BLOOM_ITERATIONS,
+	BLOOM_RESOLUTION_SCALE,
 	BYTES_PER_STAR,
 	TOKYO_LATITUDE_RAD,
 	TOKYO_LONGITUDE,
@@ -104,7 +106,12 @@ export class StarfieldRenderer {
 		destroyBlurResources(this.blurResources);
 
 		// 新しいリソースを作成
-		this.textures = createRenderTextures(this.device, width, height);
+		this.textures = createRenderTextures(
+			this.device,
+			width,
+			height,
+			BLOOM_RESOLUTION_SCALE,
+		);
 		this.blurResources = createBlurResources(
 			this.device,
 			this.pipelines,
@@ -358,6 +365,7 @@ export class StarfieldRenderer {
 			this.pipelines!,
 			this.textures!,
 			this.blurResources!,
+			BLOOM_ITERATIONS,
 		);
 
 		// Pass 6: 最終合成（シーン + ブルーム -> 画面）

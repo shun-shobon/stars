@@ -16,7 +16,7 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let scene = textureSample(sceneTexture, texSampler, input.uv).rgb;
   let bloom = textureSample(bloomTexture, texSampler, input.uv).rgb;
   
-  // シーンとブルームを合成（ブルーム強度を調整して1〜3等星を目立たせる）
+  // シーンとブルームを合成（ブルーム強度を上げて光の広がりを補正）
   let bloomStrength = 2.0;
   var color = scene * 1.2 + bloom * bloomStrength;
   

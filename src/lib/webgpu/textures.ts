@@ -9,15 +9,29 @@ export interface RenderTextures {
 	bloomViews: GPUTextureView[];
 	width: number;
 	height: number;
+	/**
+	 * ブルームテクスチャの実際の幅
+	 */
+	bloomWidth: number;
+	/**
+	 * ブルームテクスチャの実際の高さ
+	 */
+	bloomHeight: number;
 }
 
 /**
  * レンダリング用テクスチャを作成
+ *
+ * @param device GPUデバイス
+ * @param width キャンバス幅
+ * @param height キャンバス高さ
+ * @param bloomResolutionScale ブルームテクスチャの解像度スケール（デフォルト: 0.5 = 半分）
  */
 export function createRenderTextures(
 	device: GPUDevice,
 	width: number,
 	height: number,
+	bloomResolutionScale = 0.5,
 ): RenderTextures {
 	// シーンテクスチャ（フル解像度）
 	const scene = device.createTexture({
@@ -27,9 +41,10 @@ export function createRenderTextures(
 	});
 	const sceneView = scene.createView();
 
-	// ブルーム用テクスチャ（半分の解像度で2枚：ping-pong用）
-	const bloomWidth = Math.floor(width / 2);
-	const bloomHeight = Math.floor(height / 2);
+	// ブルーム用テクスチャ（指定スケールの解像度で2枚：ping-pong用）
+	// 最小サイズを保証（1以上）
+	const bloomWidth = Math.max(1, Math.floor(width * bloomResolutionScale));
+	const bloomHeight = Math.max(1, Math.floor(height * bloomResolutionScale));
 
 	const bloom: GPUTexture[] = [];
 	const bloomViews: GPUTextureView[] = [];
@@ -45,7 +60,16 @@ export function createRenderTextures(
 		bloomViews.push(tex.createView());
 	}
 
-	return { scene, sceneView, bloom, bloomViews, width, height };
+	return {
+		scene,
+		sceneView,
+		bloom,
+		bloomViews,
+		width,
+		height,
+		bloomWidth,
+		bloomHeight,
+	};
 }
 
 /**

@@ -5,7 +5,7 @@
 import type { FC } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { HINTS_DISPLAY_DURATION } from "~/constants";
+import { HINTS_DISPLAY_DURATION, MAX_DEVICE_PIXEL_RATIO } from "~/constants";
 import { useStarfield } from "~/hooks/useStarfield";
 
 import {
@@ -67,13 +67,14 @@ const Starfield: FC = () => {
 		setIsDatePickerOpen((prev) => !prev);
 	}, []);
 
-	// キャンバスサイズをウィンドウに合わせる
+	// キャンバスサイズをウィンドウに合わせる（DPR上限を適用）
 	useEffect(() => {
 		const updateSize = (): void => {
 			const canvas = canvasRef.current;
 			if (!canvas) return;
 
-			const dpr = window.devicePixelRatio;
+			// DPRに上限を設定（メモリ/帯域節約）
+			const dpr = Math.min(window.devicePixelRatio, MAX_DEVICE_PIXEL_RATIO);
 			canvas.width = window.innerWidth * dpr;
 			canvas.height = window.innerHeight * dpr;
 			canvas.style.width = `${window.innerWidth.toString()}px`;
