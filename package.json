@@ -9,7 +9,6 @@
 	"packageManager": "pnpm@10.28.0",
 	"scripts": {
 		"build": "vite build",
-		"deploy": "wrangler deploy --minify",
 		"dev": "vite",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",

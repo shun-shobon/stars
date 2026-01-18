@@ -60,7 +60,6 @@ jobs:
           command: >-
             versions
             upload
-            --minify
             --tag "${{ steps.get-version.outputs.version }}"
             --message "${{ github.event_name == 'pull_request' && format('Preview deployment for PR #{0}', github.event.pull_request.number) || 'Release deployment' }}"
 
@@ -84,7 +83,7 @@ jobs:
     runs-on: ubuntu-slim
     timeout-minutes: 5
     needs: deploy
-    if: github.event_name == 'push'
+    if: needs.deploy.outputs.success == 'true' && github.event_name != 'pull_request'
     environment:
       name: Production
       url: ${{ steps.publish.outputs.deployment-url }}
