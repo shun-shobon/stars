@@ -107,8 +107,11 @@ fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, as
   // 視線中心からの角度距離
   let angularDist = acos(clamp(dotProduct, -1.0, 1.0));
   
-  // 視野外の星を除外
-  if (angularDist > fov * 0.6) {
+  // 視野外の星を除外（矩形画面の対角線をカバーする半径を計算）
+  // 対角線の長さ = sqrt(1 + aspect^2) * (FOV/2)
+  let diagonalFactor = sqrt(1.0 + aspect * aspect);
+  let cullRadius = fov * 0.5 * diagonalFactor * 1.1;  // 少し余裕を持たせる
+  if (angularDist > cullRadius) {
     return vec4f(0.0, 0.0, -2.0, 1.0);
   }
   
