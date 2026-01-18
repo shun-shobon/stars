@@ -101,10 +101,7 @@ const Starfield: FC = () => {
 	}
 
 	return (
-		<div
-			ref={containerRef}
-			className="bg-cosmic-void relative h-svh w-svw"
-		>
+		<div ref={containerRef} className="bg-cosmic-void relative h-svh w-svw">
 			{/* 星空キャンバス */}
 			<canvas
 				ref={canvasRef}

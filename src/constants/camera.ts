@@ -8,9 +8,14 @@
 export const DRAG_SENSITIVITY = 0.005;
 
 /**
- * ズーム感度
+ * ズーム感度（マウスホイール用）
  */
 export const ZOOM_SENSITIVITY = 0.001;
+
+/**
+ * ピンチズーム感度（タッチ操作用）
+ */
+export const PINCH_ZOOM_SENSITIVITY = 0.005;
 
 /**
  * 初期方位角（ラジアン）- 北向き
@@ -33,9 +38,9 @@ export const INITIAL_FOV = Math.PI / 2;
 export const MIN_FOV = Math.PI / 6;
 
 /**
- * 最大視野角（ラジアン）- 180度
+ * 最大視野角（ラジアン）- 120度
  */
-export const MAX_FOV = Math.PI;
+export const MAX_FOV = (Math.PI * 2) / 3;
 
 /**
  * 最小高度角（ラジアン）- 地平線の少し下

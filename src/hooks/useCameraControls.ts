@@ -10,6 +10,7 @@ import {
 	MAX_FOV,
 	MIN_ALTITUDE,
 	MIN_FOV,
+	PINCH_ZOOM_SENSITIVITY,
 	ZOOM_SENSITIVITY,
 } from "~/constants";
 import type { CameraState } from "~/lib/webgpu/starfield";
@@ -26,7 +27,7 @@ export interface UseCameraControlsResult {
 	handleWheel: (e: WheelEvent) => void;
 	handleTouchStart: (e: TouchEvent) => void;
 	handleTouchMove: (e: TouchEvent) => void;
-	handleTouchEnd: () => void;
+	handleTouchEnd: (e: TouchEvent) => void;
 }
 
 /**
@@ -44,6 +45,15 @@ const normalizeAzimuth = (azimuth: number): number => {
  */
 const clampAltitude = (altitude: number): number => {
 	return Math.max(MIN_ALTITUDE, Math.min(MAX_ALTITUDE, altitude));
+};
+
+/**
+ * 2点間の距離を計算
+ */
+const getTouchDistance = (touch1: Touch, touch2: Touch): number => {
+	const dx = touch1.clientX - touch2.clientX;
+	const dy = touch1.clientY - touch2.clientY;
+	return Math.hypot(dx, dy);
 };
 
 /**
@@ -71,6 +81,8 @@ export function useCameraControls({
 	const isDraggingRef = useRef(false);
 	const lastMouseRef = useRef({ x: 0, y: 0 });
 	const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+	const isPinchingRef = useRef(false);
+	const lastPinchDistanceRef = useRef(0);
 
 	// マウスイベントハンドラー
 	const handleMouseDown = useCallback((e: MouseEvent) => {
@@ -111,35 +123,77 @@ export function useCameraControls({
 	// タッチイベントハンドラー
 	const handleTouchStart = useCallback((e: TouchEvent) => {
 		if (e.touches.length === 1) {
+			// 1本指: ドラッグ操作
 			const touch = e.touches[0];
 			if (touch) {
 				isDraggingRef.current = true;
+				isPinchingRef.current = false;
 				touchStartRef.current = { x: touch.clientX, y: touch.clientY };
 				lastMouseRef.current = { x: touch.clientX, y: touch.clientY };
+			}
+		} else if (e.touches.length === 2) {
+			// 2本指: ピンチ操作
+			const touch1 = e.touches[0];
+			const touch2 = e.touches[1];
+			if (touch1 && touch2) {
+				isDraggingRef.current = false;
+				isPinchingRef.current = true;
+				lastPinchDistanceRef.current = getTouchDistance(touch1, touch2);
 			}
 		}
 	}, []);
 
 	const handleTouchMove = useCallback(
 		(e: TouchEvent) => {
-			if (!isDraggingRef.current || e.touches.length !== 1) return;
 			e.preventDefault();
 
-			const touch = e.touches[0];
-			if (!touch) return;
+			if (e.touches.length === 2 && isPinchingRef.current) {
+				// 2本指: ピンチズーム
+				const touch1 = e.touches[0];
+				const touch2 = e.touches[1];
+				if (!touch1 || !touch2) return;
 
-			const dx = touch.clientX - lastMouseRef.current.x;
-			const dy = touch.clientY - lastMouseRef.current.y;
-			lastMouseRef.current = { x: touch.clientX, y: touch.clientY };
+				const currentDistance = getTouchDistance(touch1, touch2);
+				const deltaDistance = currentDistance - lastPinchDistanceRef.current;
+				lastPinchDistanceRef.current = currentDistance;
 
-			setCamera((prev) => updateCameraFromDrag(prev, dx, dy));
+				// ピンチイン（指を近づける）で拡大、ピンチアウト（指を離す）で縮小
+				setCamera((prev) => {
+					let newFov = prev.fov - deltaDistance * PINCH_ZOOM_SENSITIVITY;
+					newFov = Math.max(MIN_FOV, Math.min(MAX_FOV, newFov));
+					return { ...prev, fov: newFov };
+				});
+			} else if (e.touches.length === 1 && isDraggingRef.current) {
+				// 1本指: ドラッグ
+				const touch = e.touches[0];
+				if (!touch) return;
+
+				const dx = touch.clientX - lastMouseRef.current.x;
+				const dy = touch.clientY - lastMouseRef.current.y;
+				lastMouseRef.current = { x: touch.clientX, y: touch.clientY };
+
+				setCamera((prev) => updateCameraFromDrag(prev, dx, dy));
+			}
 		},
 		[setCamera],
 	);
 
-	const handleTouchEnd = useCallback(() => {
-		isDraggingRef.current = false;
-		touchStartRef.current = null;
+	const handleTouchEnd = useCallback((e: TouchEvent) => {
+		if (e.touches.length === 0) {
+			// すべての指が離れた
+			isDraggingRef.current = false;
+			isPinchingRef.current = false;
+			touchStartRef.current = null;
+			lastPinchDistanceRef.current = 0;
+		} else if (e.touches.length === 1) {
+			// 2本指から1本指に変わった場合、ドラッグモードに切り替え
+			const touch = e.touches[0];
+			if (touch) {
+				isDraggingRef.current = true;
+				isPinchingRef.current = false;
+				lastMouseRef.current = { x: touch.clientX, y: touch.clientY };
+			}
+		}
 	}, []);
 
 	return {
