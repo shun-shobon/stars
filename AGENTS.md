@@ -108,8 +108,8 @@ if (!navigator.gpu) {
 - セミコロン: あり
 - クォート: ダブルクォート
 
-**保存時のフォーマット:**
-コードを変更した後は必ず `pnpm format` を実行してください。
+**保存時のフォーマット:** コードを変更した後は必ず `pnpm format`
+を実行してください。
 
 ### 4. 命名規則
 
@@ -209,11 +209,14 @@ if (!canvas) return;
 ```
 src/
 ├── components/     # Reactコンポーネント
+├── constants/      # 定数定義
+├── data/           # データファイル（JSON）
 ├── hooks/          # カスタムフック
 ├── lib/            # ユーティリティ・ライブラリ
 │   └── webgpu/     # WebGPU関連コード
 ├── index.tsx       # エントリーポイント
-└── styles.css      # グローバルスタイル
+├── styles.css      # グローバルスタイル
+└── worker.ts       # Web Worker
 ```
 
 ### 9. スタイリング
@@ -231,7 +234,7 @@ src/
 	<div className="rounded-lg bg-red-900/50 p-6 text-center">
 		<h2 className="mb-2 text-xl font-bold text-red-300">エラー</h2>
 	</div>
-</div>
+</div>;
 ```
 
 ## CI/CD
@@ -247,7 +250,8 @@ GitHub Actionsで以下をチェック:
 
 ## 重要な注意事項
 
-1. **WebGPU互換性**: WebGPUが未サポートのブラウザに対してエラーハンドリングを実装
+1. **WebGPU互換性**:
+   WebGPUが未サポートのブラウザに対してエラーハンドリングを実装
 2. **パフォーマンス**: requestAnimationFrame を使用したレンダリングループ
 3. **メモリ管理**: WebGPUリソース（buffer, texture等）は適切にdispose
 4. **アクセシビリティ**: canvasにaria-labelを追加

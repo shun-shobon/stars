@@ -46,9 +46,6 @@ pnpm build
 # ローカルプレビュー（Wrangler）
 pnpm preview
 
-# デプロイ
-pnpm deploy
-
 # コードのフォーマット
 pnpm format
 
