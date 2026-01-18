@@ -27,6 +27,7 @@ struct VertexInput {
 struct VertexOutput {
   @builtin(position) position: vec4f,
   @location(0) alpha: f32,
+  @location(1) lineCoord: vec2f,
 }
 
 // 地平座標から3Dベクトルへ変換
@@ -131,6 +132,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   if (alt1 < -0.05 && alt2 < -0.05) {
     output.position = vec4f(0.0, 0.0, -2.0, 1.0);
     output.alpha = 0.0;
+    output.lineCoord = vec2f(0.0, 0.0);
     return output;
   }
   
@@ -143,6 +145,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   if (screen1.z < 0.0 || screen2.z < 0.0) {
     output.position = vec4f(0.0, 0.0, -2.0, 1.0);
     output.alpha = 0.0;
+    output.lineCoord = vec2f(0.0, 0.0);
     return output;
   }
   
@@ -154,6 +157,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   if (lineLength < 0.0001) {
     output.position = vec4f(0.0, 0.0, -2.0, 1.0);
     output.alpha = 0.0;
+    output.lineCoord = vec2f(0.0, 0.0);
     return output;
   }
   
@@ -168,29 +172,37 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   // 3--2
   // 頂点順序: 0, 1, 2, 0, 2, 3
   var basePos: vec2f;
+  var baseCoord: vec2f;
   var baseAlpha: f32 = uniforms.lineAlpha;
   
   switch (input.vertexIndex) {
     case 0u: {
       basePos = screen1.xy + perpendicular;
+      baseCoord = vec2f(0.0, 1.0);
     }
     case 1u: {
       basePos = screen2.xy + perpendicular;
+      baseCoord = vec2f(1.0, 1.0);
     }
     case 2u: {
       basePos = screen2.xy - perpendicular;
+      baseCoord = vec2f(1.0, -1.0);
     }
     case 3u: {
       basePos = screen1.xy + perpendicular;
+      baseCoord = vec2f(0.0, 1.0);
     }
     case 4u: {
       basePos = screen2.xy - perpendicular;
+      baseCoord = vec2f(1.0, -1.0);
     }
     case 5u: {
       basePos = screen1.xy - perpendicular;
+      baseCoord = vec2f(0.0, -1.0);
     }
     default: {
       basePos = screen1.xy;
+      baseCoord = vec2f(0.0, 0.0);
     }
   }
   
@@ -205,6 +217,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   
   output.position = vec4f(basePos, 0.5, 1.0);
   output.alpha = baseAlpha;
+  output.lineCoord = baseCoord;
   
   return output;
 }
@@ -213,6 +226,12 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   // 淡い青白色で星座線を描画
   let lineColor = vec3f(0.4, 0.5, 0.7);
-  return vec4f(lineColor * input.alpha, input.alpha);
+  let edgeDist = 1.0 - abs(input.lineCoord.y);
+  let edgeAa = max(fwidth(edgeDist), 0.0005);
+  let edgeCoverage = smoothstep(0.0, edgeAa, edgeDist);
+
+  let alpha = input.alpha * edgeCoverage;
+
+  return vec4f(lineColor * alpha, alpha);
 }
 `;

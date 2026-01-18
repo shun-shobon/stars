@@ -35,7 +35,7 @@ export const BYTES_PER_CONSTELLATION_LINE = 16;
 /**
  * 星座線の太さ（NDC単位）
  */
-export const CONSTELLATION_LINE_WIDTH = 0.001;
+export const CONSTELLATION_LINE_WIDTH = 0.002;
 
 /**
  * 星座線の透明度
