@@ -2,6 +2,8 @@
  * ブルーム効果処理
  */
 
+import { CAMERA_UNIFORM_SIZE } from "~/constants";
+
 import type { Pipelines } from "./pipelines";
 import type { SkylineResources } from "./skyline";
 import type { RenderTextures } from "./textures";
@@ -13,13 +15,10 @@ export interface BlurResources {
 
 export interface PostProcessBindGroups {
 	background: GPUBindGroup;
-	backgroundUniformBuffer: GPUBuffer;
+	cameraUniformBuffer: GPUBuffer;
 	brightPass: GPUBindGroup;
 	composite: GPUBindGroup;
-	compositeUniformBuffer: GPUBuffer;
 	compositeSettingsBuffer: GPUBuffer;
-	silhouette: GPUBindGroup;
-	silhouetteUniformBuffer: GPUBuffer;
 }
 
 /**
@@ -96,16 +95,16 @@ export function createPostProcessBindGroups(
 	sampler: GPUSampler,
 	skylineResources: SkylineResources,
 ): PostProcessBindGroups {
-	// 背景用uniformバッファ（カメラ情報：altitude, fov, aspect, azimuth, minFov, maxFov, maxCameraOffset, padding）
-	const backgroundUniformBuffer = device.createBuffer({
-		size: 32, // 8 floats
+	// カメラ共通uniformバッファ（事前計算済みカメラ基底を使用）
+	const cameraUniformBuffer = device.createBuffer({
+		size: CAMERA_UNIFORM_SIZE,
 		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	});
 
 	// 背景用バインドグループ
 	const background = device.createBindGroup({
 		layout: pipelines.background.getBindGroupLayout(0),
-		entries: [{ binding: 0, resource: { buffer: backgroundUniformBuffer } }],
+		entries: [{ binding: 0, resource: { buffer: cameraUniformBuffer } }],
 	});
 
 	// 輝度抽出用バインドグループ
@@ -115,12 +114,6 @@ export function createPostProcessBindGroups(
 			{ binding: 0, resource: textures.sceneView },
 			{ binding: 1, resource: sampler },
 		],
-	});
-
-	// 合成用uniformバッファ（カメラ情報：altitude, fov, aspect, padding）- 現在未使用だが互換性のため保持
-	const compositeUniformBuffer = device.createBuffer({
-		size: 16, // 4 floats
-		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 	});
 
 	// 合成設定用uniformバッファ（toneMappingMode, exposure, bloomStrength, padding）
@@ -137,34 +130,17 @@ export function createPostProcessBindGroups(
 			{ binding: 1, resource: textures.bloomViews[0]! },
 			{ binding: 2, resource: sampler },
 			{ binding: 3, resource: { buffer: compositeSettingsBuffer } },
-		],
-	});
-
-	// シルエット用uniformバッファ（カメラ情報：altitude, fov, aspect, azimuth, minFov, maxFov, maxCameraOffset, padding）
-	const silhouetteUniformBuffer = device.createBuffer({
-		size: 32, // 8 floats
-		usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-	});
-
-	// シルエット用バインドグループ（スカイラインテクスチャを含む）
-	// r32floatはフィルタリング非対応のためtextureLoadを使用（サンプラー不要）
-	const silhouette = device.createBindGroup({
-		layout: pipelines.silhouette.getBindGroupLayout(0),
-		entries: [
-			{ binding: 0, resource: { buffer: silhouetteUniformBuffer } },
-			{ binding: 1, resource: skylineResources.textureView },
+			{ binding: 4, resource: { buffer: cameraUniformBuffer } },
+			{ binding: 5, resource: skylineResources.textureView },
 		],
 	});
 
 	return {
 		background,
-		backgroundUniformBuffer,
+		cameraUniformBuffer,
 		brightPass,
 		composite,
-		compositeUniformBuffer,
 		compositeSettingsBuffer,
-		silhouette,
-		silhouetteUniformBuffer,
 	};
 }
 

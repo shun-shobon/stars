@@ -6,18 +6,22 @@
 
 export const constellationShaderCode = /* wgsl */ `
 struct Uniforms {
-  azimuth: f32,         // 観測者の視線方位角
-  altitude: f32,        // 観測者の視線高度角
-  fov: f32,             // 視野角
-  aspect: f32,          // アスペクト比
+  viewDir: vec3f,
+  _pad0: f32,
+  right: vec3f,
+  _pad1: f32,
+  up: vec3f,
+  _pad2: f32,
+  cameraPos: vec3f,
+  _pad3: f32,
+  projScale: f32,
+  aspect: f32,
+  cullRadius: f32,
+  _pad4: f32,
   latitude: f32,        // 観測地の緯度 (ラジアン)
   lst: f32,             // 地方恒星時 (ラジアン)
   lineWidth: f32,       // 線の太さ (NDC単位)
   lineAlpha: f32,       // 線の透明度
-  minFov: f32,          // 最小視野角
-  maxFov: f32,          // 最大視野角
-  maxCameraOffset: f32, // カメラオフセット最大値
-  padding: f32,         // 16バイトアライメント用パディング
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -74,59 +78,32 @@ fn equatorialToHorizontal(ra: f32, dec: f32, lat: f32, lst: f32) -> vec2f {
   return vec2f(az, alt);
 }
 
-// FOVに応じたカメラオフセットを計算
-fn calculateCameraOffset(fov: f32, minFov: f32, maxFov: f32, maxOffset: f32) -> f32 {
-  let t = clamp((fov - minFov) / (maxFov - minFov), 0.0, 1.0);
-  return maxOffset * t;
-}
-
 // 地平座標から画面座標へ変換（カメラオフセット対応）
-fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, aspect: f32, minFov: f32, maxFov: f32, maxCameraOffset: f32) -> vec4f {
+fn horizontalToScreen(az: f32, alt: f32) -> vec4f {
   // 点の3D位置（天球上、単位ベクトル）
   let pointPos = horizontalToCartesian(az, alt);
   
-  // 視線方向の単位ベクトル
-  let viewDir = horizontalToCartesian(viewAz, viewAlt);
-  
-  // FOVに応じたカメラオフセットを計算
-  let cameraOffset = calculateCameraOffset(fov, minFov, maxFov, maxCameraOffset);
-  let cameraPos = -viewDir * cameraOffset;
-  
   // カメラから点へのベクトル
-  let toPoint = pointPos - cameraPos;
+  let toPoint = pointPos - uniforms.cameraPos;
   let toPointDist = length(toPoint);
   let toPointDir = toPoint / toPointDist;
   
-  let worldUp = vec3f(0.0, 1.0, 0.0);
-  var right = cross(worldUp, viewDir);
-  
-  if (length(right) < 0.001) {
-    right = vec3f(1.0, 0.0, 0.0);
-  } else {
-    right = normalize(right);
-  }
-  
-  let up = normalize(cross(viewDir, right));
-  
-  let dotProduct = dot(toPointDir, viewDir);
+  let dotProduct = dot(toPointDir, uniforms.viewDir);
   if (dotProduct < 0.0) {
     return vec4f(0.0, 0.0, -2.0, 1.0);
   }
   
   let angularDist = acos(clamp(dotProduct, -1.0, 1.0));
-  let diagonalFactor = sqrt(1.0 + aspect * aspect);
-  let cullRadius = fov * 0.5 * diagonalFactor * 1.1;
-  if (angularDist > cullRadius) {
+  if (angularDist > uniforms.cullRadius) {
     return vec4f(0.0, 0.0, -2.0, 1.0);
   }
   
-  let x = dot(toPointDir, right);
-  let y = dot(toPointDir, up);
+  let x = dot(toPointDir, uniforms.right);
+  let y = dot(toPointDir, uniforms.up);
   let z = dotProduct;
   
-  let scale = 1.0 / tan(fov * 0.5);
-  let screenX = (x / z) * scale / aspect;
-  let screenY = (y / z) * scale;
+  let screenX = (x / z) * uniforms.projScale / uniforms.aspect;
+  let screenY = (y / z) * uniforms.projScale;
   
   return vec4f(screenX, screenY, 0.5, 1.0);
 }
@@ -159,8 +136,8 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   }
   
   // 画面座標に変換（カメラオフセット対応）
-  let screen1 = horizontalToScreen(az1, alt1, uniforms.azimuth, uniforms.altitude, uniforms.fov, uniforms.aspect, uniforms.minFov, uniforms.maxFov, uniforms.maxCameraOffset);
-  let screen2 = horizontalToScreen(az2, alt2, uniforms.azimuth, uniforms.altitude, uniforms.fov, uniforms.aspect, uniforms.minFov, uniforms.maxFov, uniforms.maxCameraOffset);
+  let screen1 = horizontalToScreen(az1, alt1);
+  let screen2 = horizontalToScreen(az2, alt2);
   
   // どちらかの端点が視野外なら線分全体を非表示
   // （片方だけ視野外の場合、その端点が(0,0)になり中央から線が伸びてしまうため）
@@ -188,11 +165,11 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   // 垂直方向のオフセット（線幅）
   let perpendicular = vec2f(-lineDir.y, lineDir.x) * uniforms.lineWidth;
   
-  // 6頂点の矩形を構成
+  // 4頂点の矩形を構成（triangle-strip）
   // 0--1
   // |  |
-  // 3--2
-  // 頂点順序: 0, 1, 2, 0, 2, 3
+  // 2--3
+  // 頂点順序: 0, 1, 2, 3
   var basePos: vec2f;
   var baseCoord: vec2f;
   var baseAlpha: f32 = uniforms.lineAlpha;
@@ -207,20 +184,12 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
       baseCoord = vec2f(1.0, 1.0);
     }
     case 2u: {
-      basePos = screen2.xy - perpendicular;
-      baseCoord = vec2f(1.0, -1.0);
-    }
-    case 3u: {
-      basePos = screen1.xy + perpendicular;
-      baseCoord = vec2f(0.0, 1.0);
-    }
-    case 4u: {
-      basePos = screen2.xy - perpendicular;
-      baseCoord = vec2f(1.0, -1.0);
-    }
-    case 5u: {
       basePos = screen1.xy - perpendicular;
       baseCoord = vec2f(0.0, -1.0);
+    }
+    case 3u: {
+      basePos = screen2.xy - perpendicular;
+      baseCoord = vec2f(1.0, -1.0);
     }
     default: {
       basePos = screen1.xy;

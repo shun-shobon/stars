@@ -8,7 +8,6 @@ import {
 	brightPassShaderCode,
 	compositeShaderCode,
 	constellationShaderCode,
-	silhouetteShaderCode,
 	starShaderCode,
 } from "./shaders";
 
@@ -19,7 +18,6 @@ export interface Pipelines {
 	brightPass: GPURenderPipeline;
 	blur: GPURenderPipeline;
 	composite: GPURenderPipeline;
-	silhouette: GPURenderPipeline;
 }
 
 /**
@@ -94,7 +92,7 @@ export function createPipelines(
 			],
 		},
 		primitive: {
-			topology: "triangle-list",
+			topology: "triangle-strip",
 		},
 	});
 
@@ -140,7 +138,7 @@ export function createPipelines(
 			],
 		},
 		primitive: {
-			topology: "triangle-list",
+			topology: "triangle-strip",
 		},
 	});
 
@@ -213,29 +211,6 @@ export function createPipelines(
 		},
 	});
 
-	// シルエット（建物スカイライン）パイプライン
-	const silhouetteModule = device.createShaderModule({
-		label: "Silhouette shader",
-		code: silhouetteShaderCode,
-	});
-
-	const silhouette = device.createRenderPipeline({
-		label: "Silhouette pipeline",
-		layout: "auto",
-		vertex: {
-			module: silhouetteModule,
-			entryPoint: "vertexMain",
-		},
-		fragment: {
-			module: silhouetteModule,
-			entryPoint: "fragmentMain",
-			targets: [{ format }],
-		},
-		primitive: {
-			topology: "triangle-list",
-		},
-	});
-
 	return {
 		background,
 		constellation,
@@ -243,6 +218,5 @@ export function createPipelines(
 		brightPass,
 		blur,
 		composite,
-		silhouette,
 	};
 }

@@ -4,18 +4,22 @@
 
 export const starShaderCode = /* wgsl */ `
 struct Uniforms {
-  azimuth: f32,         // 観測者の視線方位角
-  altitude: f32,        // 観測者の視線高度角
-  fov: f32,             // 視野角
-  aspect: f32,          // アスペクト比
+  viewDir: vec3f,
+  _pad0: f32,
+  right: vec3f,
+  _pad1: f32,
+  up: vec3f,
+  _pad2: f32,
+  cameraPos: vec3f,
+  _pad3: f32,
+  projScale: f32,
+  aspect: f32,
+  cullRadius: f32,
+  _pad4: f32,
   latitude: f32,        // 観測地の緯度 (ラジアン)
   lst: f32,             // 地方恒星時 (ラジアン)
   minMag: f32,          // 最小等級
   maxMag: f32,          // 最大等級
-  minFov: f32,          // 最小視野角
-  maxFov: f32,          // 最大視野角
-  maxCameraOffset: f32, // カメラオフセット最大値
-  padding: f32,         // 16バイトアライメント用パディング
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -80,46 +84,18 @@ fn equatorialToHorizontal(ra: f32, dec: f32, lat: f32, lst: f32) -> vec2f {
   return vec2f(az, alt);
 }
 
-// FOVに応じたカメラオフセットを計算
-fn calculateCameraOffset(fov: f32, minFov: f32, maxFov: f32, maxOffset: f32) -> f32 {
-  let t = clamp((fov - minFov) / (maxFov - minFov), 0.0, 1.0);
-  return maxOffset * t;
-}
-
 // 地平座標から画面座標へ変換（カメラオフセット対応）
-fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, aspect: f32, minFov: f32, maxFov: f32, maxCameraOffset: f32) -> vec4f {
+fn horizontalToScreen(az: f32, alt: f32) -> vec4f {
   // 星の3D位置（天球上、単位ベクトル）
   let starPos = horizontalToCartesian(az, alt);
   
-  // 視線方向の単位ベクトル
-  let viewDir = horizontalToCartesian(viewAz, viewAlt);
-  
-  // FOVに応じたカメラオフセットを計算
-  // カメラ位置 = 視線方向の逆方向にオフセット
-  let cameraOffset = calculateCameraOffset(fov, minFov, maxFov, maxCameraOffset);
-  let cameraPos = -viewDir * cameraOffset;
-  
   // カメラから星へのベクトル
-  let toStar = starPos - cameraPos;
+  let toStar = starPos - uniforms.cameraPos;
   let toStarDist = length(toStar);
   let toStarDir = toStar / toStarDist;
   
-  // 視線方向を基準とした座標系を構築
-  // 右手座標系: right = worldUp × viewDir (視線方向を見たときの右方向)
-  let worldUp = vec3f(0.0, 1.0, 0.0);
-  var right = cross(worldUp, viewDir);
-  
-  // 真上/真下を見ている場合の処理
-  if (length(right) < 0.001) {
-    right = vec3f(1.0, 0.0, 0.0);
-  } else {
-    right = normalize(right);
-  }
-  
-  let up = normalize(cross(viewDir, right));
-  
   // 星が視線方向の前方にあるかチェック
-  let dotProduct = dot(toStarDir, viewDir);
+  let dotProduct = dot(toStarDir, uniforms.viewDir);
   if (dotProduct < 0.0) {
     return vec4f(0.0, 0.0, -2.0, 1.0);
   }
@@ -127,23 +103,19 @@ fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, as
   // 視線中心からの角度距離（カリング用）
   let angularDist = acos(clamp(dotProduct, -1.0, 1.0));
   
-  // 視野外の星を除外（矩形画面の対角線をカバーする半径を計算）
-  // 対角線の長さ = sqrt(1 + aspect^2) * (FOV/2)
-  let diagonalFactor = sqrt(1.0 + aspect * aspect);
-  let cullRadius = fov * 0.5 * diagonalFactor * 1.1;  // 少し余裕を持たせる
-  if (angularDist > cullRadius) {
+  // 視野外の星を除外
+  if (angularDist > uniforms.cullRadius) {
     return vec4f(0.0, 0.0, -2.0, 1.0);
   }
   
   // 星を視線座標系に投影
-  let x = dot(toStarDir, right);
-  let y = dot(toStarDir, up);
+  let x = dot(toStarDir, uniforms.right);
+  let y = dot(toStarDir, uniforms.up);
   let z = dotProduct;
   
   // 透視投影
-  let scale = 1.0 / tan(fov * 0.5);
-  let screenX = (x / z) * scale / aspect;
-  let screenY = (y / z) * scale;
+  let screenX = (x / z) * uniforms.projScale / uniforms.aspect;
+  let screenY = (y / z) * uniforms.projScale;
   
   return vec4f(screenX, screenY, 0.5, 1.0);
 }
@@ -220,7 +192,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   }
   
   // 画面座標に変換（カメラオフセット対応）
-  let screenPos = horizontalToScreen(az, alt, uniforms.azimuth, uniforms.altitude, uniforms.fov, uniforms.aspect, uniforms.minFov, uniforms.maxFov, uniforms.maxCameraOffset);
+  let screenPos = horizontalToScreen(az, alt);
   
   // 等級から明るさとサイズを計算（等級差ベース + ソフトニー圧縮）
   // 等級差: 1等級 = 2.512倍の光度比
@@ -259,14 +231,12 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let sizeRange = 0.004;
   var baseSize = minSize + sizeRange * pow(normalizedBrightness, sizeGamma);
   
-  // クワッドの頂点位置
-  let quadVertices = array<vec2f, 6>(
+  // クワッドの頂点位置（triangle-strip）
+  let quadVertices = array<vec2f, 4>(
     vec2f(-1.0, -1.0),
     vec2f(1.0, -1.0),
-    vec2f(1.0, 1.0),
-    vec2f(-1.0, -1.0),
-    vec2f(1.0, 1.0),
-    vec2f(-1.0, 1.0)
+    vec2f(-1.0, 1.0),
+    vec2f(1.0, 1.0)
   );
   
   let vertexOffset = quadVertices[input.vertexIndex];

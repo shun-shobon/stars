@@ -417,71 +417,127 @@ export class StarfieldRenderer {
 
 		const lst = calculateLocalSiderealTime(time, TOKYO_LONGITUDE);
 
-		// 星シェーダー用Uniform（12 floats）
-		const uniformData = new Float32Array(12);
-		uniformData[0] = camera.azimuth;
-		uniformData[1] = camera.altitude;
-		uniformData[2] = camera.fov;
-		uniformData[3] = this.canvas.width / this.canvas.height;
-		uniformData[4] = TOKYO_LATITUDE_RAD;
-		uniformData[5] = lst;
-		uniformData[6] = this.meta.minMagnitude;
-		uniformData[7] = this.meta.maxMagnitude;
-		uniformData[8] = MIN_FOV;
-		uniformData[9] = MAX_FOV;
-		uniformData[10] = MAX_CAMERA_OFFSET;
+		type Vec3 = [number, number, number];
+
+		const horizontalToCartesian = (azimuth: number, altitude: number): Vec3 => {
+			const cosAlt = Math.cos(altitude);
+			return [
+				cosAlt * Math.sin(azimuth),
+				Math.sin(altitude),
+				cosAlt * Math.cos(azimuth),
+			] as Vec3;
+		};
+		const cross = (a: Vec3, b: Vec3): Vec3 =>
+			[
+				a[1] * b[2] - a[2] * b[1],
+				a[2] * b[0] - a[0] * b[2],
+				a[0] * b[1] - a[1] * b[0],
+			] as Vec3;
+		const length = (v: Vec3) => Math.hypot(v[0], v[1], v[2]);
+		const normalize = (v: Vec3): Vec3 => {
+			const len = length(v);
+			if (len === 0) return [0, 0, 0];
+			return [v[0] / len, v[1] / len, v[2] / len] as Vec3;
+		};
+		const calculateCameraOffset = (
+			fov: number,
+			minFov: number,
+			maxFov: number,
+			maxOffset: number,
+		) => {
+			const t = Math.max(0, Math.min(1, (fov - minFov) / (maxFov - minFov)));
+			return maxOffset * t;
+		};
+
+		const aspect = this.canvas.width / this.canvas.height;
+		const viewDir = normalize(
+			horizontalToCartesian(camera.azimuth, camera.altitude),
+		);
+		const worldUp: Vec3 = [0, 1, 0];
+		let right = cross(worldUp, viewDir);
+		right = length(right) < 0.001 ? [1, 0, 0] : normalize(right);
+		const up = normalize(cross(viewDir, right));
+		const cameraOffset = calculateCameraOffset(
+			camera.fov,
+			MIN_FOV,
+			MAX_FOV,
+			MAX_CAMERA_OFFSET,
+		);
+		const cameraPos: Vec3 = [
+			-viewDir[0] * cameraOffset,
+			-viewDir[1] * cameraOffset,
+			-viewDir[2] * cameraOffset,
+		];
+		const tanHalfFov = Math.tan(camera.fov * 0.5);
+		const projScale = 1 / tanHalfFov;
+		const diagonalFactor = Math.sqrt(1 + aspect * aspect);
+		const cullRadius = camera.fov * 0.5 * diagonalFactor * 1.1;
+
+		// 星シェーダー用Uniform（24 floats）
+		const uniformData = new Float32Array(24);
+		uniformData[0] = viewDir[0];
+		uniformData[1] = viewDir[1];
+		uniformData[2] = viewDir[2];
+		uniformData[3] = 0; // padding
+		uniformData[4] = right[0];
+		uniformData[5] = right[1];
+		uniformData[6] = right[2];
+		uniformData[7] = 0; // padding
+		uniformData[8] = up[0];
+		uniformData[9] = up[1];
+		uniformData[10] = up[2];
 		uniformData[11] = 0; // padding
+		uniformData[12] = cameraPos[0];
+		uniformData[13] = cameraPos[1];
+		uniformData[14] = cameraPos[2];
+		uniformData[15] = 0; // padding
+		uniformData[16] = projScale;
+		uniformData[17] = aspect;
+		uniformData[18] = cullRadius;
+		uniformData[19] = 0; // padding
+		uniformData[20] = TOKYO_LATITUDE_RAD;
+		uniformData[21] = lst;
+		uniformData[22] = this.meta.minMagnitude;
+		uniformData[23] = this.meta.maxMagnitude;
 
 		this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
 
-		// 共通のカメラuniformデータ（background, composite, silhouette用）
-		// 8 floats: altitude, fov, aspect, azimuth, minFov, maxFov, maxCameraOffset, padding
-		const cameraUniformData = new Float32Array(8);
-		cameraUniformData[0] = camera.altitude; // 視線の高度角
-		cameraUniformData[1] = camera.fov; // 視野角
-		cameraUniformData[2] = this.canvas.width / this.canvas.height; // アスペクト比
-		cameraUniformData[3] = camera.azimuth; // 方位角
-		cameraUniformData[4] = MIN_FOV; // 最小視野角
-		cameraUniformData[5] = MAX_FOV; // 最大視野角
-		cameraUniformData[6] = MAX_CAMERA_OFFSET; // カメラオフセット最大値
+		// 共通のカメラuniformデータ（background, composite用）
+		const cameraUniformData = new Float32Array(20);
+		cameraUniformData[0] = viewDir[0];
+		cameraUniformData[1] = viewDir[1];
+		cameraUniformData[2] = viewDir[2];
+		cameraUniformData[3] = 0; // padding
+		cameraUniformData[4] = right[0];
+		cameraUniformData[5] = right[1];
+		cameraUniformData[6] = right[2];
 		cameraUniformData[7] = 0; // padding
+		cameraUniformData[8] = up[0];
+		cameraUniformData[9] = up[1];
+		cameraUniformData[10] = up[2];
+		cameraUniformData[11] = 0; // padding
+		cameraUniformData[12] = cameraPos[0];
+		cameraUniformData[13] = cameraPos[1];
+		cameraUniformData[14] = cameraPos[2];
+		cameraUniformData[15] = 0; // padding
+		cameraUniformData[16] = tanHalfFov;
+		cameraUniformData[17] = aspect;
+		cameraUniformData[18] = 0; // padding
+		cameraUniformData[19] = 0; // padding
 
-		// background用のカメラuniform更新
-		if (this.postProcessBindGroups?.backgroundUniformBuffer) {
-			this.device.queue.writeBuffer(
-				this.postProcessBindGroups.backgroundUniformBuffer,
-				0,
-				cameraUniformData,
-			);
-		}
+		const postProcess = this.postProcessBindGroups;
+		if (postProcess) {
+			const cameraUniformBuffer: GPUBuffer = postProcess.cameraUniformBuffer;
+			this.device.queue.writeBuffer(cameraUniformBuffer, 0, cameraUniformData);
 
-		// composite用のカメラuniform更新
-		if (this.postProcessBindGroups?.compositeUniformBuffer) {
-			this.device.queue.writeBuffer(
-				this.postProcessBindGroups.compositeUniformBuffer,
-				0,
-				cameraUniformData,
-			);
-		}
-
-		// silhouette用のカメラuniform更新
-		if (this.postProcessBindGroups?.silhouetteUniformBuffer) {
-			this.device.queue.writeBuffer(
-				this.postProcessBindGroups.silhouetteUniformBuffer,
-				0,
-				cameraUniformData,
-			);
-		}
-
-		// composite設定uniform更新（HDR/SDR切替）
-		if (this.postProcessBindGroups?.compositeSettingsBuffer) {
+			// composite設定uniform更新（HDR/SDR切替）
 			const compositeSettings = new Float32Array(4);
 			compositeSettings[0] = this.hdrConfig.toneMappingMode; // トーンマッピングモード
 			compositeSettings[1] = this.hdrConfig.enabled ? 1 : 1.2; // 露出（HDR時は低め）
 			compositeSettings[2] = this.hdrConfig.enabled ? 1.5 : 2; // ブルーム強度（HDR時は控えめ）
 			compositeSettings[3] = 0; // padding
 			this.device.queue.writeBuffer(
-				this.postProcessBindGroups.compositeSettingsBuffer,
+				postProcess.compositeSettingsBuffer,
 				0,
 				compositeSettings,
 			);
@@ -489,19 +545,31 @@ export class StarfieldRenderer {
 
 		// 星座線用uniform更新
 		if (this.constellationUniformBuffer) {
-			const constellationUniformData = new Float32Array(12);
-			constellationUniformData[0] = camera.azimuth;
-			constellationUniformData[1] = camera.altitude;
-			constellationUniformData[2] = camera.fov;
-			constellationUniformData[3] = this.canvas.width / this.canvas.height;
-			constellationUniformData[4] = TOKYO_LATITUDE_RAD;
-			constellationUniformData[5] = lst;
-			constellationUniformData[6] = CONSTELLATION_LINE_WIDTH;
-			constellationUniformData[7] = CONSTELLATION_LINE_ALPHA;
-			constellationUniformData[8] = MIN_FOV;
-			constellationUniformData[9] = MAX_FOV;
-			constellationUniformData[10] = MAX_CAMERA_OFFSET;
+			const constellationUniformData = new Float32Array(24);
+			constellationUniformData[0] = viewDir[0];
+			constellationUniformData[1] = viewDir[1];
+			constellationUniformData[2] = viewDir[2];
+			constellationUniformData[3] = 0; // padding
+			constellationUniformData[4] = right[0];
+			constellationUniformData[5] = right[1];
+			constellationUniformData[6] = right[2];
+			constellationUniformData[7] = 0; // padding
+			constellationUniformData[8] = up[0];
+			constellationUniformData[9] = up[1];
+			constellationUniformData[10] = up[2];
 			constellationUniformData[11] = 0; // padding
+			constellationUniformData[12] = cameraPos[0];
+			constellationUniformData[13] = cameraPos[1];
+			constellationUniformData[14] = cameraPos[2];
+			constellationUniformData[15] = 0; // padding
+			constellationUniformData[16] = projScale;
+			constellationUniformData[17] = aspect;
+			constellationUniformData[18] = cullRadius;
+			constellationUniformData[19] = 0; // padding
+			constellationUniformData[20] = TOKYO_LATITUDE_RAD;
+			constellationUniformData[21] = lst;
+			constellationUniformData[22] = CONSTELLATION_LINE_WIDTH;
+			constellationUniformData[23] = CONSTELLATION_LINE_ALPHA;
 			this.device.queue.writeBuffer(
 				this.constellationUniformBuffer,
 				0,
@@ -562,7 +630,7 @@ export class StarfieldRenderer {
 			constellationPass.setPipeline(this.pipelines!.constellation);
 			constellationPass.setBindGroup(0, this.constellationBindGroup);
 			constellationPass.setVertexBuffer(0, this.constellationBuffer);
-			constellationPass.draw(6, this.constellationLineCount);
+			constellationPass.draw(4, this.constellationLineCount);
 			constellationPass.end();
 		}
 
@@ -579,7 +647,7 @@ export class StarfieldRenderer {
 		starPass.setPipeline(this.pipelines!.star);
 		starPass.setBindGroup(0, this.starBindGroup);
 		starPass.setVertexBuffer(0, this.starBuffer);
-		starPass.draw(6, this.loadedStarCount);
+		starPass.draw(4, this.loadedStarCount);
 		starPass.end();
 
 		// Pass 3: 輝度抽出（シーン -> bloom[0]）
@@ -622,21 +690,6 @@ export class StarfieldRenderer {
 		compositePass.draw(6);
 		compositePass.end();
 
-		// Pass 7: シルエット（建物スカイライン）を最前面に描画
-		const silhouettePass = commandEncoder.beginRenderPass({
-			colorAttachments: [
-				{
-					view: this.context!.getCurrentTexture().createView(),
-					loadOp: "load", // 合成結果を保持
-					storeOp: "store",
-				},
-			],
-		});
-		silhouettePass.setPipeline(this.pipelines!.silhouette);
-		silhouettePass.setBindGroup(0, this.postProcessBindGroups!.silhouette);
-		silhouettePass.draw(6);
-		silhouettePass.end();
-
 		this.device!.queue.submit([commandEncoder.finish()]);
 	}
 
@@ -649,10 +702,8 @@ export class StarfieldRenderer {
 		this.uniformBuffer?.destroy();
 		this.constellationBuffer?.destroy();
 		this.constellationUniformBuffer?.destroy();
-		this.postProcessBindGroups?.backgroundUniformBuffer.destroy();
-		this.postProcessBindGroups?.compositeUniformBuffer.destroy();
+		this.postProcessBindGroups?.cameraUniformBuffer.destroy();
 		this.postProcessBindGroups?.compositeSettingsBuffer.destroy();
-		this.postProcessBindGroups?.silhouetteUniformBuffer.destroy();
 		destroyRenderTextures(this.textures);
 		destroyBlurResources(this.blurResources);
 		destroySkylineTexture(this.skylineResources);
