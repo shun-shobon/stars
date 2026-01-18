@@ -50,15 +50,6 @@ jobs:
           version="$(git rev-parse --short ${{ github.sha }})"
           echo "version=${version}" >> $GITHUB_OUTPUT
 
-      - name: Setup | Generate types
-        run: pnpm run sync
-
-      - name: Setup | Cache astro assets
-        uses: actions/cache@8b402f58fbc84540c8b491a91e594a4576fec3d7 # v5.0.2
-        with:
-          path: node_modules/.astro
-          key: astro-assets
-
       - name: Run | Build
         run: pnpm run build
 
