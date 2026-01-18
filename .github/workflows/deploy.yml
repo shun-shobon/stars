@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-slim
     timeout-minutes: 5
     needs: deploy
-    if: needs.deploy.outputs.success == 'true' && github.event_name != 'pull_request'
+    if: github.event_name == 'push'
     environment:
       name: Production
       url: ${{ steps.publish.outputs.deployment-url }}
