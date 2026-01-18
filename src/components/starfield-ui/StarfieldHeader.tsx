@@ -34,14 +34,6 @@ export const StarfieldHeader: FC<StarfieldHeaderProps> = ({
 
 					{/* モバイル: 縦並び、デスクトップ: 横並び */}
 					<div className="flex flex-col items-center gap-2 sm:flex-row sm:gap-4">
-						{/* タイトル */}
-						<h1 className="text-display text-gradient-gold text-xs tracking-widest sm:text-sm">
-							東京の星空
-						</h1>
-
-						<div className="celestial-divider hidden h-6 sm:block sm:w-px" />
-						<div className="celestial-divider w-16 sm:hidden" />
-
 						{/* 日時表示 */}
 						<div className="flex items-center gap-2 sm:gap-3">
 							<div className="text-center sm:text-right">
