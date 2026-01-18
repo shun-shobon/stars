@@ -2,8 +2,10 @@
  * カメラ制御用カスタムフック
  */
 
+import { useSetAtom } from "jotai";
 import { useCallback, useRef } from "react";
 
+import { cameraAtom } from "~/atoms";
 import {
 	DRAG_SENSITIVITY,
 	MAX_ALTITUDE,
@@ -13,11 +15,10 @@ import {
 	PINCH_ZOOM_SENSITIVITY,
 	ZOOM_SENSITIVITY,
 } from "~/constants";
-import type { CameraState } from "~/lib/webgpu/starfield";
+import type { CameraState } from "~/lib/webgpu/types";
 
 export interface UseCameraControlsProps {
 	canvasRef: React.RefObject<HTMLCanvasElement | null>;
-	setCamera: React.Dispatch<React.SetStateAction<CameraState>>;
 }
 
 export interface UseCameraControlsResult {
@@ -76,8 +77,9 @@ const updateCameraFromDrag = (
 
 export function useCameraControls({
 	canvasRef,
-	setCamera,
 }: UseCameraControlsProps): UseCameraControlsResult {
+	const setCamera = useSetAtom(cameraAtom);
+
 	const isDraggingRef = useRef(false);
 	const lastMouseRef = useRef({ x: 0, y: 0 });
 	const touchStartRef = useRef<{ x: number; y: number } | null>(null);

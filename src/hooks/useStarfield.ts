@@ -1,170 +1,61 @@
 /**
- * 星空レンダラーを管理するカスタムフック
+ * 星空表示に必要なすべての機能を統合するカスタムフック
+ *
+ * 内部で以下のフックを使用:
+ *
+ * - UseStarfieldRenderer: レンダラー初期化・レンダリング
+ * - UseRealtimeClock: リアルタイム時刻更新
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useAtomValue } from "jotai";
 
-import { INITIAL_ALTITUDE, INITIAL_AZIMUTH, INITIAL_FOV } from "~/constants";
-import { getDirectionName } from "~/lib/astronomy";
-import type { CameraState } from "~/lib/webgpu/starfield";
-import { StarfieldRenderer } from "~/lib/webgpu/starfield";
+import {
+	altitudeDegreesAtom,
+	directionAtom,
+	errorAtom,
+	isLoadingAtom,
+	loadingProgressAtom,
+	showConstellationsAtom,
+} from "~/atoms";
 
-import { useCameraControls } from "./useCameraControls";
+import { useRealtimeClock } from "./useRealtimeClock";
+import { useStarfieldRenderer } from "./useStarfieldRenderer";
 
 export interface UseStarfieldResult {
 	canvasRef: React.RefObject<HTMLCanvasElement | null>;
-	camera: CameraState;
 	direction: string;
 	altitude: number;
 	isLoading: boolean;
 	loadingProgress: number;
 	error: string | null;
-	currentTime: Date;
-	setCurrentTime: (time: Date) => void;
-	isRealtimeMode: boolean;
-	setRealtimeMode: (enabled: boolean) => void;
 	showConstellations: boolean;
-	setShowConstellations: (visible: boolean) => void;
 }
 
+/**
+ * 星空表示に必要なすべての状態とセットアップを提供する
+ */
 export function useStarfield(): UseStarfieldResult {
-	const canvasRef = useRef<HTMLCanvasElement | null>(null);
-	const rendererRef = useRef<StarfieldRenderer | null>(null);
-	const animationFrameRef = useRef<number>(0);
+	// レンダラー初期化・レンダリング
+	const { canvasRef } = useStarfieldRenderer();
 
-	const [camera, setCamera] = useState<CameraState>({
-		azimuth: INITIAL_AZIMUTH,
-		altitude: INITIAL_ALTITUDE,
-		fov: INITIAL_FOV,
-	});
+	// リアルタイム時刻更新
+	useRealtimeClock();
 
-	const [direction, setDirection] = useState("北");
-	const [isLoading, setIsLoading] = useState(true);
-	const [loadingProgress, setLoadingProgress] = useState(0);
-	const [error, setError] = useState<string | null>(null);
-	const [currentTime, setCurrentTime] = useState(new Date());
-	const [isRealtimeMode, setRealtimeMode] = useState(true);
-	const [showConstellations, setShowConstellationsState] = useState(true);
-
-	// カメラ制御フック
-	const {
-		handleMouseDown,
-		handleMouseMove,
-		handleMouseUp,
-		handleWheel,
-		handleTouchStart,
-		handleTouchMove,
-		handleTouchEnd,
-	} = useCameraControls({ canvasRef, setCamera });
-
-	// 進捗コールバック
-	const handleProgress = useCallback((progress: number) => {
-		setLoadingProgress(progress);
-	}, []);
-
-	// 星座線表示切り替え
-	const setShowConstellations = useCallback((visible: boolean) => {
-		setShowConstellationsState(visible);
-		rendererRef.current?.setConstellationVisibility(visible);
-	}, []);
-
-	// 初期化
-	useEffect(() => {
-		const canvas = canvasRef.current;
-		if (!canvas) return;
-
-		const renderer = new StarfieldRenderer();
-		rendererRef.current = renderer;
-
-		const init = async (): Promise<void> => {
-			try {
-				await renderer.init(canvas);
-				await renderer.loadStarData(handleProgress);
-				setIsLoading(false);
-			} catch (error_) {
-				setError(
-					error_ instanceof Error ? error_.message : "初期化に失敗しました",
-				);
-				setIsLoading(false);
-			}
-		};
-
-		void init();
-
-		// イベントリスナー登録
-		canvas.addEventListener("mousedown", handleMouseDown);
-		globalThis.addEventListener("mousemove", handleMouseMove);
-		globalThis.addEventListener("mouseup", handleMouseUp);
-		canvas.addEventListener("wheel", handleWheel, { passive: false });
-		canvas.addEventListener("touchstart", handleTouchStart);
-		canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
-		canvas.addEventListener("touchend", handleTouchEnd);
-
-		return () => {
-			canvas.removeEventListener("mousedown", handleMouseDown);
-			globalThis.removeEventListener("mousemove", handleMouseMove);
-			globalThis.removeEventListener("mouseup", handleMouseUp);
-			canvas.removeEventListener("wheel", handleWheel);
-			canvas.removeEventListener("touchstart", handleTouchStart);
-			canvas.removeEventListener("touchmove", handleTouchMove);
-			canvas.removeEventListener("touchend", handleTouchEnd);
-			renderer.dispose();
-		};
-	}, [
-		handleMouseDown,
-		handleMouseMove,
-		handleMouseUp,
-		handleWheel,
-		handleTouchStart,
-		handleTouchMove,
-		handleTouchEnd,
-		handleProgress,
-	]);
-
-	// リアルタイムモードの時刻更新
-	useEffect(() => {
-		if (!isRealtimeMode) return;
-
-		const interval = setInterval(() => {
-			setCurrentTime(new Date());
-		}, 1000);
-
-		return () => {
-			clearInterval(interval);
-		};
-	}, [isRealtimeMode]);
-
-	// レンダリングループ
-	useEffect(() => {
-		const renderer = rendererRef.current;
-		if (!renderer || error) return;
-
-		const render = (): void => {
-			renderer.render(camera, currentTime);
-			setDirection(getDirectionName(camera.azimuth));
-			animationFrameRef.current = requestAnimationFrame(render);
-		};
-
-		animationFrameRef.current = requestAnimationFrame(render);
-
-		return () => {
-			cancelAnimationFrame(animationFrameRef.current);
-		};
-	}, [camera, currentTime, error]);
+	// 状態の購読（表示用）
+	const direction = useAtomValue(directionAtom);
+	const altitude = useAtomValue(altitudeDegreesAtom);
+	const isLoading = useAtomValue(isLoadingAtom);
+	const loadingProgress = useAtomValue(loadingProgressAtom);
+	const error = useAtomValue(errorAtom);
+	const showConstellations = useAtomValue(showConstellationsAtom);
 
 	return {
 		canvasRef,
-		camera,
 		direction,
-		altitude: (camera.altitude * 180) / Math.PI,
+		altitude,
 		isLoading,
 		loadingProgress,
 		error,
-		currentTime,
-		setCurrentTime,
-		isRealtimeMode,
-		setRealtimeMode,
 		showConstellations,
-		setShowConstellations,
 	};
 }

@@ -2,9 +2,17 @@
  * 星空表示コンポーネント Celestial Observatory Design
  */
 
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import type { FC } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
+import {
+	currentTimeAtom,
+	isDatePickerOpenAtom,
+	isRealtimeModeAtom,
+	showConstellationsAtom,
+	showHintsAtom,
+} from "~/atoms";
 import { HINTS_DISPLAY_DURATION, MAX_DEVICE_PIXEL_RATIO } from "~/constants";
 import { useStarfield } from "~/hooks/useStarfield";
 
@@ -16,23 +24,20 @@ import {
 import { ErrorPanel, LoadingIndicator } from "./ui";
 
 const Starfield: FC = () => {
-	const {
-		canvasRef,
-		direction,
-		altitude,
-		isLoading,
-		loadingProgress,
-		error,
-		currentTime,
-		setCurrentTime,
-		setRealtimeMode,
-		showConstellations,
-		setShowConstellations,
-	} = useStarfield();
+	const { canvasRef, direction, altitude, isLoading, loadingProgress, error } =
+		useStarfield();
 
 	const containerRef = useRef<HTMLDivElement>(null);
-	const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-	const [showHints, setShowHints] = useState(true);
+
+	// Jotai atoms
+	const [isDatePickerOpen, setIsDatePickerOpen] = useAtom(isDatePickerOpenAtom);
+	const [showHints, setShowHints] = useAtom(showHintsAtom);
+	const [showConstellations, setShowConstellations] = useAtom(
+		showConstellationsAtom,
+	);
+	const currentTime = useAtomValue(currentTimeAtom);
+	const setCurrentTime = useSetAtom(currentTimeAtom);
+	const setRealtimeMode = useSetAtom(isRealtimeModeAtom);
 
 	// 操作ヒントを一定時間後に非表示
 	useEffect(() => {
@@ -43,7 +48,7 @@ const Starfield: FC = () => {
 		return () => {
 			clearTimeout(timer);
 		};
-	}, []);
+	}, [setShowHints]);
 
 	// 日付・時刻変更ハンドラー（指定時刻モードに切り替え）
 	const handleDateTimeChange = useCallback(
@@ -62,12 +67,12 @@ const Starfield: FC = () => {
 		setRealtimeMode(true);
 		setCurrentTime(new Date());
 		setIsDatePickerOpen(false);
-	}, [setCurrentTime, setRealtimeMode]);
+	}, [setCurrentTime, setRealtimeMode, setIsDatePickerOpen]);
 
 	// 日時ピッカーの開閉
 	const handleDatePickerToggle = useCallback((): void => {
 		setIsDatePickerOpen((prev) => !prev);
-	}, []);
+	}, [setIsDatePickerOpen]);
 
 	// 星座線トグル
 	const handleToggleConstellations = useCallback((): void => {
