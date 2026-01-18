@@ -18,9 +18,9 @@ export const BLOOM_RESOLUTION_SCALE = 0.5;
 export const MAX_DEVICE_PIXEL_RATIO = 2;
 
 /**
- * Uniform バッファサイズ（12 floats = 48 bytes、16バイトアライメントで48バイト）
+ * Uniform バッファサイズ（20 floats = 80 bytes、16バイトアライメント）
  */
-export const UNIFORM_BUFFER_SIZE = 48;
+export const UNIFORM_BUFFER_SIZE = 80;
 
 /**
  * 1星あたりのバイト数（4 floats）

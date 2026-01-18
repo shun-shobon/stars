@@ -4,18 +4,11 @@
 
 export const starShaderCode = /* wgsl */ `
 struct Uniforms {
-  azimuth: f32,         // 観測者の視線方位角
-  altitude: f32,        // 観測者の視線高度角
-  fov: f32,             // 視野角
-  aspect: f32,          // アスペクト比
-  latitude: f32,        // 観測地の緯度 (ラジアン)
-  lst: f32,             // 地方恒星時 (ラジアン)
-  minMag: f32,          // 最小等級
-  maxMag: f32,          // 最大等級
-  minFov: f32,          // 最小視野角
-  maxFov: f32,          // 最大視野角
-  maxCameraOffset: f32, // カメラオフセット最大値
-  padding: f32,         // 16バイトアライメント用パディング
+  location: vec4f,    // latitude, lst, minMag, maxMag
+  projection: vec4f,  // projectionScale, cullRadius, aspect, padding
+  viewRight: vec4f,   // 視線右方向
+  viewUp: vec4f,      // 視線上方向
+  viewDir: vec4f,     // 視線前方向
 }
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -54,11 +47,15 @@ fn equatorialToHorizontal(ra: f32, dec: f32, lat: f32, lst: f32) -> vec2f {
   let sinLat = sin(lat);
   let cosLat = cos(lat);
   let cosHa = cos(ha);
-  let sinHa = sin(ha);
   
   // 高度 (Altitude)
   let sinAlt = sinDec * sinLat + cosDec * cosLat * cosHa;
   let alt = asin(clamp(sinAlt, -1.0, 1.0));
+
+  // 地平線以下の星は方位角の計算をスキップ
+  if (alt < 0.0) {
+    return vec2f(0.0, alt);
+  }
   
   // 方位角 (Azimuth) - 北=0, 東=90度, 南=180度, 西=270度
   let cosAlt = cos(alt);
@@ -68,6 +65,7 @@ fn equatorialToHorizontal(ra: f32, dec: f32, lat: f32, lst: f32) -> vec2f {
     az = 0.0;
   } else {
     // atan2を使って方位角を計算（より正確）
+    let sinHa = sin(ha);
     let x = -sinHa * cosDec;
     let y = cosLat * sinDec - sinLat * cosDec * cosHa;
     az = atan2(x, y);
@@ -80,46 +78,13 @@ fn equatorialToHorizontal(ra: f32, dec: f32, lat: f32, lst: f32) -> vec2f {
   return vec2f(az, alt);
 }
 
-// FOVに応じたカメラオフセットを計算
-fn calculateCameraOffset(fov: f32, minFov: f32, maxFov: f32, maxOffset: f32) -> f32 {
-  let t = clamp((fov - minFov) / (maxFov - minFov), 0.0, 1.0);
-  return maxOffset * t;
-}
-
-// 地平座標から画面座標へ変換（カメラオフセット対応）
-fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, aspect: f32, minFov: f32, maxFov: f32, maxCameraOffset: f32) -> vec4f {
-  // 星の3D位置（天球上、単位ベクトル）
-  let starPos = horizontalToCartesian(az, alt);
-  
-  // 視線方向の単位ベクトル
-  let viewDir = horizontalToCartesian(viewAz, viewAlt);
-  
-  // FOVに応じたカメラオフセットを計算
-  // カメラ位置 = 視線方向の逆方向にオフセット
-  let cameraOffset = calculateCameraOffset(fov, minFov, maxFov, maxCameraOffset);
-  let cameraPos = -viewDir * cameraOffset;
-  
-  // カメラから星へのベクトル
-  let toStar = starPos - cameraPos;
-  let toStarDist = length(toStar);
-  let toStarDir = toStar / toStarDist;
-  
-  // 視線方向を基準とした座標系を構築
-  // 右手座標系: right = worldUp × viewDir (視線方向を見たときの右方向)
-  let worldUp = vec3f(0.0, 1.0, 0.0);
-  var right = cross(worldUp, viewDir);
-  
-  // 真上/真下を見ている場合の処理
-  if (length(right) < 0.001) {
-    right = vec3f(1.0, 0.0, 0.0);
-  } else {
-    right = normalize(right);
-  }
-  
-  let up = normalize(cross(viewDir, right));
+// 地平座標から画面座標へ変換
+fn horizontalToScreen(az: f32, alt: f32) -> vec4f {
+  // 星の3D位置
+  let starDir = horizontalToCartesian(az, alt);
   
   // 星が視線方向の前方にあるかチェック
-  let dotProduct = dot(toStarDir, viewDir);
+  let dotProduct = dot(starDir, uniforms.viewDir.xyz);
   if (dotProduct < 0.0) {
     return vec4f(0.0, 0.0, -2.0, 1.0);
   }
@@ -129,20 +94,19 @@ fn horizontalToScreen(az: f32, alt: f32, viewAz: f32, viewAlt: f32, fov: f32, as
   
   // 視野外の星を除外（矩形画面の対角線をカバーする半径を計算）
   // 対角線の長さ = sqrt(1 + aspect^2) * (FOV/2)
-  let diagonalFactor = sqrt(1.0 + aspect * aspect);
-  let cullRadius = fov * 0.5 * diagonalFactor * 1.1;  // 少し余裕を持たせる
+  let cullRadius = uniforms.projection.y;  // 少し余裕を持たせる
   if (angularDist > cullRadius) {
     return vec4f(0.0, 0.0, -2.0, 1.0);
   }
   
   // 星を視線座標系に投影
-  let x = dot(toStarDir, right);
-  let y = dot(toStarDir, up);
+  let x = dot(starDir, uniforms.viewRight.xyz);
+  let y = dot(starDir, uniforms.viewUp.xyz);
   let z = dotProduct;
   
   // 透視投影
-  let scale = 1.0 / tan(fov * 0.5);
-  let screenX = (x / z) * scale / aspect;
+  let scale = uniforms.projection.x;
+  let screenX = (x / z) * scale / uniforms.projection.z;
   let screenY = (y / z) * scale;
   
   return vec4f(screenX, screenY, 0.5, 1.0);
@@ -206,7 +170,12 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let bv = input.starData.w;
   
   // 地平座標に変換
-  let horizontal = equatorialToHorizontal(ra, dec, uniforms.latitude, uniforms.lst);
+  let horizontal = equatorialToHorizontal(
+    ra,
+    dec,
+    uniforms.location.x,
+    uniforms.location.y
+  );
   let az = horizontal.x;
   let alt = horizontal.y;
   
@@ -219,8 +188,8 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
     return output;
   }
   
-  // 画面座標に変換（カメラオフセット対応）
-  let screenPos = horizontalToScreen(az, alt, uniforms.azimuth, uniforms.altitude, uniforms.fov, uniforms.aspect, uniforms.minFov, uniforms.maxFov, uniforms.maxCameraOffset);
+  // 画面座標に変換
+  let screenPos = horizontalToScreen(az, alt);
   
   // 等級から明るさとサイズを計算（等級差ベース + ソフトニー圧縮）
   // 等級差: 1等級 = 2.512倍の光度比
@@ -249,7 +218,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   // 6.5等星より暗い星は減衰
   let visibleLimit = 6.5;
   if (mag > visibleLimit) {
-    let extraDim = (mag - visibleLimit) / (uniforms.maxMag - visibleLimit);
+    let extraDim = (mag - visibleLimit) / (uniforms.location.w - visibleLimit);
     brightness = brightness * (1.0 - extraDim * 0.7);
   }
   
@@ -273,7 +242,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   let size = baseSize;
   
   output.position = vec4f(
-    screenPos.x + vertexOffset.x * size / uniforms.aspect,
+    screenPos.x + vertexOffset.x * size / uniforms.projection.z,
     screenPos.y + vertexOffset.y * size,
     screenPos.z,
     1.0

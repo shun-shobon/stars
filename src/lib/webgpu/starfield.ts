@@ -417,20 +417,68 @@ export class StarfieldRenderer {
 
 		const lst = calculateLocalSiderealTime(time, TOKYO_LONGITUDE);
 
-		// 星シェーダー用Uniform（12 floats）
-		const uniformData = new Float32Array(12);
-		uniformData[0] = camera.azimuth;
-		uniformData[1] = camera.altitude;
-		uniformData[2] = camera.fov;
-		uniformData[3] = this.canvas.width / this.canvas.height;
-		uniformData[4] = TOKYO_LATITUDE_RAD;
-		uniformData[5] = lst;
-		uniformData[6] = this.meta.minMagnitude;
-		uniformData[7] = this.meta.maxMagnitude;
-		uniformData[8] = MIN_FOV;
-		uniformData[9] = MAX_FOV;
-		uniformData[10] = MAX_CAMERA_OFFSET;
-		uniformData[11] = 0; // padding
+		const uniformData = new Float32Array(20);
+		uniformData[0] = TOKYO_LATITUDE_RAD;
+		uniformData[1] = lst;
+		uniformData[2] = this.meta.minMagnitude;
+		uniformData[3] = this.meta.maxMagnitude;
+
+		const aspect = this.canvas.width / this.canvas.height;
+		const projectionScale = 1 / Math.tan(camera.fov * 0.5);
+		const diagonalFactor = Math.sqrt(1 + aspect * aspect);
+		const cullRadius = camera.fov * 0.5 * diagonalFactor * 1.1;
+		uniformData[4] = projectionScale;
+		uniformData[5] = cullRadius;
+		uniformData[6] = aspect;
+
+		// 視線方向の基底ベクトルをCPU側で計算してシェーダー負荷を軽減
+		const cosAlt = Math.cos(camera.altitude);
+		const viewDir = {
+			x: cosAlt * Math.sin(camera.azimuth),
+			y: Math.sin(camera.altitude),
+			z: cosAlt * Math.cos(camera.azimuth),
+		};
+
+		// 注: カメラオフセット機能は現在のシェーダー最適化により省略されています
+		// 将来的に必要であれば、uniformに追加することで対応可能です
+
+		let right = {
+			x: viewDir.z,
+			y: 0,
+			z: -viewDir.x,
+		};
+		const rightLength = Math.hypot(right.x, right.y, right.z);
+		if (rightLength < 0.001) {
+			right = { x: 1, y: 0, z: 0 };
+		} else {
+			right = {
+				x: right.x / rightLength,
+				y: right.y / rightLength,
+				z: right.z / rightLength,
+			};
+		}
+
+		const up = {
+			x: viewDir.y * right.z - viewDir.z * right.y,
+			y: viewDir.z * right.x - viewDir.x * right.z,
+			z: viewDir.x * right.y - viewDir.y * right.x,
+		};
+		const upLength = Math.hypot(up.x, up.y, up.z);
+		const normalizedUp = {
+			x: upLength > 0 ? up.x / upLength : 0,
+			y: upLength > 0 ? up.y / upLength : 1,
+			z: upLength > 0 ? up.z / upLength : 0,
+		};
+
+		uniformData[8] = right.x;
+		uniformData[9] = right.y;
+		uniformData[10] = right.z;
+		uniformData[12] = normalizedUp.x;
+		uniformData[13] = normalizedUp.y;
+		uniformData[14] = normalizedUp.z;
+		uniformData[16] = viewDir.x;
+		uniformData[17] = viewDir.y;
+		uniformData[18] = viewDir.z;
 
 		this.device.queue.writeBuffer(this.uniformBuffer, 0, uniformData);
 
@@ -439,7 +487,7 @@ export class StarfieldRenderer {
 		const cameraUniformData = new Float32Array(8);
 		cameraUniformData[0] = camera.altitude; // 視線の高度角
 		cameraUniformData[1] = camera.fov; // 視野角
-		cameraUniformData[2] = this.canvas.width / this.canvas.height; // アスペクト比
+		cameraUniformData[2] = aspect; // アスペクト比
 		cameraUniformData[3] = camera.azimuth; // 方位角
 		cameraUniformData[4] = MIN_FOV; // 最小視野角
 		cameraUniformData[5] = MAX_FOV; // 最大視野角
