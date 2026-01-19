@@ -9,9 +9,10 @@ import {
 	cameraAtom,
 	constellationDataAtom,
 	currentTimeAtom,
+	loadingProgressAtom,
 	rendererAtom,
 	showConstellationsAtom,
-	starDataAtom,
+	starDataReaderAtom,
 } from "~/atoms";
 import { AUTO_ROTATE_SPEED } from "~/constants";
 import { store } from "~/lib/store";
@@ -29,14 +30,16 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const animationFrameRef = useRef<number>(0);
 	const isAttachedRef = useRef(false);
+	const isLoadingRef = useRef(false);
 
 	// useAtomValueでPromise atomからデータ取得（Suspenseでawait）
 	const renderer = useAtomValue(rendererAtom);
-	const starData = useAtomValue(starDataAtom);
+	const starDataReader = useAtomValue(starDataReaderAtom);
 	const constellationData = useAtomValue(constellationDataAtom);
 
 	// Jotai atoms
 	const setCamera = useSetAtom(cameraAtom);
+	const setLoadingProgress = useSetAtom(loadingProgressAtom);
 	const showConstellations = useAtomValue(showConstellationsAtom);
 
 	// カメラ制御フック
@@ -60,9 +63,19 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 		renderer.attachCanvas(canvas);
 		isAttachedRef.current = true;
 
-		// データをGPUバッファに転送（sync、既存の場合はスキップ）
-		renderer.setStarData(starData);
+		// 星データバッファを初期化（sync、既存の場合はスキップ）
+		renderer.initStarBuffer();
+
+		// 星座データをGPUバッファに転送（sync、既存の場合はスキップ）
 		renderer.setConstellationData(constellationData);
+
+		// 星データのストリーミング読み込みを開始（async、バックグラウンドで実行）
+		if (!isLoadingRef.current) {
+			isLoadingRef.current = true;
+			void renderer.loadStarDataFromReader(starDataReader, (progress) => {
+				setLoadingProgress(progress);
+			});
+		}
 
 		// イベントリスナー登録
 		canvas.addEventListener("mousedown", handleMouseDown);
@@ -88,8 +101,9 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 		};
 	}, [
 		renderer,
-		starData,
+		starDataReader,
 		constellationData,
+		setLoadingProgress,
 		handleMouseDown,
 		handleMouseMove,
 		handleMouseUp,

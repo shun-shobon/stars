@@ -248,10 +248,10 @@ export class StarfieldRenderer {
 	}
 
 	/**
-	 * 星データをGPUバッファに設定する
-	 * 事前にfetchしたArrayBufferを受け取る
+	 * 星データバッファを初期化する
+	 * ストリーミング読み込み前に呼び出す
 	 */
-	setStarData(data: ArrayBuffer): void {
+	initStarBuffer(): void {
 		if (!this.device || !this.pipelines || !this.uniformBuffer) {
 			throw new Error("initDevice()を先に呼び出してください");
 		}
@@ -283,12 +283,80 @@ export class StarfieldRenderer {
 				},
 			],
 		});
+	}
 
-		// GPUバッファにデータを書き込み
-		this.device.queue.writeBuffer(this.starBuffer, 0, new Uint8Array(data));
+	/**
+	 * Readerからストリーミングで星データを読み込む
+	 * 進捗コールバックで進捗を通知
+	 */
+	async loadStarDataFromReader(
+		reader: ReadableStreamDefaultReader<Uint8Array>,
+		onProgress?: (progress: number) => void,
+	): Promise<void> {
+		if (!this.device || !this.starBuffer) {
+			throw new Error("initStarBuffer()を先に呼び出してください");
+		}
+
+		// 既に読み込み完了している場合はスキップ（StrictMode対応）
+		if (this.loadedStarCount >= this.starCount) {
+			return;
+		}
+
+		const totalBytes = this.starCount * BYTES_PER_STAR;
+		let receivedBytes = 0;
+		let pendingBuffer = new Uint8Array(0);
+
+		while (true) {
+			const { done, value } = await reader.read();
+
+			if (done) {
+				break;
+			}
+
+			// 前回の残りと今回のチャンクを結合
+			const combined = new Uint8Array(pendingBuffer.length + value.length);
+			combined.set(pendingBuffer);
+			combined.set(value, pendingBuffer.length);
+
+			// 16バイト境界で処理
+			const alignedBytes =
+				Math.floor(combined.length / BYTES_PER_STAR) * BYTES_PER_STAR;
+
+			if (alignedBytes > 0) {
+				// GPUバッファに書き込み
+				const alignedData = combined.slice(0, alignedBytes);
+				this.device.queue.writeBuffer(
+					this.starBuffer,
+					receivedBytes,
+					alignedData,
+				);
+
+				receivedBytes += alignedBytes;
+				this.loadedStarCount = receivedBytes / BYTES_PER_STAR;
+
+				// 進捗コールバック
+				if (onProgress) {
+					const progress = Math.round((receivedBytes / totalBytes) * 100);
+					onProgress(progress);
+				}
+			}
+
+			// 余りを保持
+			pendingBuffer = combined.slice(alignedBytes);
+		}
+
+		// 残りのデータがあれば処理（通常はないはず）
+		if (pendingBuffer.length > 0) {
+			console.warn(
+				`未処理のデータが残っています: ${pendingBuffer.length.toString()} bytes`,
+			);
+		}
 
 		// 読み込み完了
 		this.loadedStarCount = this.starCount;
+		if (onProgress) {
+			onProgress(100);
+		}
 	}
 
 	/**
