@@ -4,24 +4,19 @@
 
 import { atom } from "jotai";
 
-import type { StarfieldRenderer } from "~/lib/webgpu/starfield";
+import { StarfieldRenderer } from "~/lib/webgpu/starfield";
 
 /**
- * レンダラーインスタンス
+ * レンダラーインスタンス（Promise atom）
+ * initDevice()を実行した状態のrendererを返す
  */
-export const rendererAtom = atom<StarfieldRenderer | null>(null);
-
-/**
- * ローディング中かどうか
- */
-export const isLoadingAtom = atom(true);
+export const rendererAtom = atom(async () => {
+	const renderer = new StarfieldRenderer();
+	await renderer.initDevice();
+	return renderer;
+});
 
 /**
  * ローディング進捗（0-100）
  */
 export const loadingProgressAtom = atom(0);
-
-/**
- * エラーメッセージ
- */
-export const errorAtom = atom<string | null>(null);

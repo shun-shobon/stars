@@ -21,11 +21,9 @@ import {
 	StarfieldHeader,
 	StarfieldHints,
 } from "./starfield-ui";
-import { ErrorPanel, LoadingIndicator } from "./ui";
 
 const Starfield: FC = () => {
-	const { canvasRef, camera, isLoading, loadingProgress, error } =
-		useStarfield();
+	const { canvasRef, camera } = useStarfield();
 
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -100,11 +98,6 @@ const Starfield: FC = () => {
 		};
 	}, [canvasRef]);
 
-	// エラー表示
-	if (error) {
-		return <ErrorPanel message={error} />;
-	}
-
 	return (
 		<div ref={containerRef} className="bg-cosmic-void relative h-svh w-svw">
 			{/* 星空キャンバス */}
@@ -113,9 +106,6 @@ const Starfield: FC = () => {
 				className="absolute inset-0 cursor-grab active:cursor-grabbing"
 				aria-label="東京からの星空表示。ドラッグで視点移動、ホイールでズーム"
 			/>
-
-			{/* ローディング表示 */}
-			{isLoading && <LoadingIndicator progress={loadingProgress} />}
 
 			{/* ヘッダーパネル */}
 			<StarfieldHeader
