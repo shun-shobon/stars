@@ -5,8 +5,7 @@
 import { atom } from "jotai";
 
 /**
- * 星データのReaderを取得するatom
- * fetchを開始してReaderを返す（ストリーミング用）
+ * 星データのReaderを取得するatom fetchを開始してReaderを返す（ストリーミング用）
  */
 export const starDataReaderAtom = atom(async () => {
 	const response = await fetch("/stars.bin");

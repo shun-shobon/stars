@@ -76,6 +76,7 @@ export class StarfieldRenderer {
 
 	private starCount = 0;
 	private loadedStarCount = 0;
+	private starLoadPromise: Promise<void> | null = null;
 	private meta: StarfieldMeta | null = null;
 	private canvas: HTMLCanvasElement | null = null;
 
@@ -88,8 +89,7 @@ export class StarfieldRenderer {
 	private hasHdrDisplay = false;
 
 	/**
-	 * WebGPUデバイスを初期化する（canvas不要な部分）
-	 * Promise atomでキャッシュ可能
+	 * WebGPUデバイスを初期化する（canvas不要な部分） Promise atomでキャッシュ可能
 	 */
 	async initDevice(): Promise<void> {
 		// eslint-disable-next-line typescript/no-unnecessary-condition -- navigator.gpu may be undefined in non-supporting browsers
@@ -131,11 +131,13 @@ export class StarfieldRenderer {
 			size: UNIFORM_BUFFER_SIZE,
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
+
+		// 星データバッファを初期化（canvas不要）
+		this.ensureStarBuffer();
 	}
 
 	/**
-	 * canvasをアタッチしてWebGPUコンテキストを設定する
-	 * useEffect内で呼び出す（同期処理）
+	 * CanvasをアタッチしてWebGPUコンテキストを設定する useEffect内で呼び出す（同期処理）
 	 */
 	attachCanvas(canvas: HTMLCanvasElement): void {
 		if (!this.device) {
@@ -154,8 +156,7 @@ export class StarfieldRenderer {
 	}
 
 	/**
-	 * canvasをデタッチする（リソースは破棄しない）
-	 * StrictMode対応: cleanupでdisposeの代わりに呼び出す
+	 * Canvasをデタッチする（リソースは破棄しない） StrictMode対応: cleanupでdisposeの代わりに呼び出す
 	 */
 	detachCanvas(): void {
 		// contextのunconfigureは不要（次のattachCanvasで再設定される）
@@ -248,10 +249,9 @@ export class StarfieldRenderer {
 	}
 
 	/**
-	 * 星データバッファを初期化する
-	 * ストリーミング読み込み前に呼び出す
+	 * 星データバッファを初期化する（内部用）
 	 */
-	initStarBuffer(): void {
+	private ensureStarBuffer(): void {
 		if (!this.device || !this.pipelines || !this.uniformBuffer) {
 			throw new Error("initDevice()を先に呼び出してください");
 		}
@@ -286,82 +286,101 @@ export class StarfieldRenderer {
 	}
 
 	/**
-	 * Readerからストリーミングで星データを読み込む
-	 * 進捗コールバックで進捗を通知
+	 * Readerからストリーミングで星データを読み込む 進捗コールバックで進捗を通知
 	 */
 	async loadStarDataFromReader(
 		reader: ReadableStreamDefaultReader<Uint8Array>,
 		onProgress?: (progress: number) => void,
 	): Promise<void> {
-		if (!this.device || !this.starBuffer) {
-			throw new Error("initStarBuffer()を先に呼び出してください");
+		this.ensureStarBuffer();
+
+		if (this.starLoadPromise) {
+			return this.starLoadPromise;
 		}
 
 		// 既に読み込み完了している場合はスキップ（StrictMode対応）
 		if (this.loadedStarCount >= this.starCount) {
+			if (onProgress) {
+				onProgress(100);
+			}
 			return;
 		}
 
-		const totalBytes = this.starCount * BYTES_PER_STAR;
-		let receivedBytes = 0;
-		let pendingBuffer = new Uint8Array(0);
-
-		while (true) {
-			const { done, value } = await reader.read();
-
-			if (done) {
-				break;
+		const loadPromise = (async () => {
+			if (!this.device || !this.starBuffer) {
+				throw new Error("initDevice()を先に呼び出してください");
 			}
 
-			// 前回の残りと今回のチャンクを結合
-			const combined = new Uint8Array(pendingBuffer.length + value.length);
-			combined.set(pendingBuffer);
-			combined.set(value, pendingBuffer.length);
+			const totalBytes = this.starCount * BYTES_PER_STAR;
+			let receivedBytes = 0;
+			let pendingBuffer = new Uint8Array(0);
 
-			// 16バイト境界で処理
-			const alignedBytes =
-				Math.floor(combined.length / BYTES_PER_STAR) * BYTES_PER_STAR;
+			while (true) {
+				const { done, value } = await reader.read();
 
-			if (alignedBytes > 0) {
-				// GPUバッファに書き込み
-				const alignedData = combined.slice(0, alignedBytes);
-				this.device.queue.writeBuffer(
-					this.starBuffer,
-					receivedBytes,
-					alignedData,
-				);
-
-				receivedBytes += alignedBytes;
-				this.loadedStarCount = receivedBytes / BYTES_PER_STAR;
-
-				// 進捗コールバック
-				if (onProgress) {
-					const progress = Math.round((receivedBytes / totalBytes) * 100);
-					onProgress(progress);
+				if (done) {
+					break;
 				}
+
+				// 前回の残りと今回のチャンクを結合
+				const combined = new Uint8Array(pendingBuffer.length + value.length);
+				combined.set(pendingBuffer);
+				combined.set(value, pendingBuffer.length);
+
+				// 16バイト境界で処理
+				const alignedBytes =
+					Math.floor(combined.length / BYTES_PER_STAR) * BYTES_PER_STAR;
+
+				if (alignedBytes > 0) {
+					// GPUバッファに書き込み
+					const alignedData = combined.slice(0, alignedBytes);
+					this.device.queue.writeBuffer(
+						this.starBuffer,
+						receivedBytes,
+						alignedData,
+					);
+
+					receivedBytes += alignedBytes;
+					this.loadedStarCount = receivedBytes / BYTES_PER_STAR;
+
+					// 進捗コールバック
+					if (onProgress) {
+						const progress = Math.round((receivedBytes / totalBytes) * 100);
+						onProgress(progress);
+					}
+				}
+
+				// 余りを保持
+				pendingBuffer = combined.slice(alignedBytes);
 			}
 
-			// 余りを保持
-			pendingBuffer = combined.slice(alignedBytes);
-		}
+			// 残りのデータがあれば処理（通常はないはず）
+			if (pendingBuffer.length > 0) {
+				console.warn(
+					`未処理のデータが残っています: ${pendingBuffer.length.toString()} bytes`,
+				);
+			}
 
-		// 残りのデータがあれば処理（通常はないはず）
-		if (pendingBuffer.length > 0) {
-			console.warn(
-				`未処理のデータが残っています: ${pendingBuffer.length.toString()} bytes`,
-			);
-		}
+			// 読み込み完了
+			this.loadedStarCount = this.starCount;
+			if (onProgress) {
+				onProgress(100);
+			}
+		})();
 
-		// 読み込み完了
-		this.loadedStarCount = this.starCount;
-		if (onProgress) {
-			onProgress(100);
+		this.starLoadPromise = loadPromise;
+
+		try {
+			await loadPromise;
+		} finally {
+			if (this.starLoadPromise === loadPromise) {
+				this.starLoadPromise = null;
+			}
 		}
 	}
 
 	/**
-	 * 星座線データをGPUバッファに設定する
-	 * 事前にfetchしたArrayBufferを受け取る
+	 * 星座線データをGPUバッファに設定する 事前にfetchしたArrayBufferを受け取る
 	 */
 	setConstellationData(data: ArrayBuffer): void {
 		if (!this.device || !this.pipelines || !this.uniformBuffer) {
