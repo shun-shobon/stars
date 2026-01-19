@@ -70,8 +70,8 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 		const init = async (): Promise<void> => {
 			try {
 				await newRenderer.init(canvas);
-				await newRenderer.loadStarData(handleProgress);
 				setRenderer(newRenderer);
+				await newRenderer.loadStarData(handleProgress);
 				setIsLoading(false);
 			} catch (error_) {
 				setError(
