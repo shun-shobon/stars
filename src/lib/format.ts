@@ -3,23 +3,6 @@
  */
 
 /**
- * 方角を日本語に変換
- */
-export const formatDirectionJP = (direction: string): string => {
-	const directionMap: Record<string, string> = {
-		N: "北",
-		NE: "北東",
-		E: "東",
-		SE: "南東",
-		S: "南",
-		SW: "南西",
-		W: "西",
-		NW: "北西",
-	};
-	return directionMap[direction] ?? direction;
-};
-
-/**
  * 時刻をフォーマット (HH:MM:SS)
  */
 export const formatTime = (date: Date): string => {

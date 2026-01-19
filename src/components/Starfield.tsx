@@ -17,14 +17,14 @@ import { HINTS_DISPLAY_DURATION, MAX_DEVICE_PIXEL_RATIO } from "~/constants";
 import { useStarfield } from "~/hooks/useStarfield";
 
 import {
-	StarfieldFooter,
+	DirectionLabels,
 	StarfieldHeader,
 	StarfieldHints,
 } from "./starfield-ui";
 import { ErrorPanel, LoadingIndicator } from "./ui";
 
 const Starfield: FC = () => {
-	const { canvasRef, direction, altitude, isLoading, loadingProgress, error } =
+	const { canvasRef, camera, isLoading, loadingProgress, error } =
 		useStarfield();
 
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -124,14 +124,16 @@ const Starfield: FC = () => {
 				onDatePickerToggle={handleDatePickerToggle}
 				onDateTimeChange={handleDateTimeChange}
 				onResetToNow={handleResetToNow}
-			/>
-
-			{/* フッターパネル */}
-			<StarfieldFooter
-				direction={direction}
-				altitude={altitude}
 				showConstellations={showConstellations}
 				onToggleConstellations={handleToggleConstellations}
+			/>
+
+			{/* 方角ラベル */}
+			<DirectionLabels
+				azimuth={camera.azimuth}
+				altitude={camera.altitude}
+				fov={camera.fov}
+				aspect={window.innerWidth / window.innerHeight}
 			/>
 
 			{/* 操作ヒント */}

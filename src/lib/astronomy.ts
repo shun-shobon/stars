@@ -30,39 +30,3 @@ export const calculateLocalSiderealTime = (
 	const lst = ((gmst + longitude) * Math.PI) / 180;
 	return lst;
 };
-
-/**
- * 16方位の名称
- */
-const DIRECTION_NAMES = [
-	"北",
-	"北北東",
-	"北東",
-	"東北東",
-	"東",
-	"東南東",
-	"南東",
-	"南南東",
-	"南",
-	"南南西",
-	"南西",
-	"西南西",
-	"西",
-	"西北西",
-	"北西",
-	"北北西",
-] as const;
-
-/**
- * 方位角から方角名を取得
- *
- * @param azimuth - 方位角（ラジアン）
- * @returns 16方位の日本語名
- */
-export const getDirectionName = (azimuth: number): string => {
-	let deg = ((azimuth * 180) / Math.PI) % 360;
-	if (deg < 0) deg += 360;
-
-	const index = Math.round(deg / 22.5) % 16;
-	return DIRECTION_NAMES[index] ?? "不明";
-};

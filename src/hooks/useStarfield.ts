@@ -10,21 +10,20 @@
 import { useAtomValue } from "jotai";
 
 import {
-	altitudeDegreesAtom,
-	directionAtom,
+	cameraAtom,
 	errorAtom,
 	isLoadingAtom,
 	loadingProgressAtom,
 	showConstellationsAtom,
 } from "~/atoms";
+import type { CameraState } from "~/lib/webgpu/types";
 
 import { useRealtimeClock } from "./useRealtimeClock";
 import { useStarfieldRenderer } from "./useStarfieldRenderer";
 
 export interface UseStarfieldResult {
 	canvasRef: React.RefObject<HTMLCanvasElement | null>;
-	direction: string;
-	altitude: number;
+	camera: CameraState;
 	isLoading: boolean;
 	loadingProgress: number;
 	error: string | null;
@@ -42,8 +41,7 @@ export function useStarfield(): UseStarfieldResult {
 	useRealtimeClock();
 
 	// 状態の購読（表示用）
-	const direction = useAtomValue(directionAtom);
-	const altitude = useAtomValue(altitudeDegreesAtom);
+	const camera = useAtomValue(cameraAtom);
 	const isLoading = useAtomValue(isLoadingAtom);
 	const loadingProgress = useAtomValue(loadingProgressAtom);
 	const error = useAtomValue(errorAtom);
@@ -51,8 +49,7 @@ export function useStarfield(): UseStarfieldResult {
 
 	return {
 		canvasRef,
-		direction,
-		altitude,
+		camera,
 		isLoading,
 		loadingProgress,
 		error,
