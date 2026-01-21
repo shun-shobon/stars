@@ -30,7 +30,7 @@
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "1.21.0",
-		"@shun-shobon/style-guide": "2.2.2",
+		"@shun-shobon/style-guide": "2.2.3",
 		"@tailwindcss/vite": "4.1.18",
 		"@tsconfig/strictest": "2.0.8",
 		"@tsconfig/vite-react": "7.0.2",
