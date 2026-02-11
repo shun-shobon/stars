@@ -10,11 +10,6 @@ export interface StarfieldMeta {
 	maxBV: number;
 }
 
-export type LoadProgressCallback = (
-	progress: number,
-	loadedCount: number,
-) => void;
-
 export interface CameraState {
 	/**
 	 * 方位角 (ラジアン)
