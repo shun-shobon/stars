@@ -6,7 +6,7 @@
 	"author": "NISHIZAWA Shuntaro <me@s2n.tech> (https://s2n.tech/)",
 	"license": "MIT",
 	"private": true,
-	"packageManager": "pnpm@10.29.3",
+	"packageManager": "pnpm@10.30.0",
 	"scripts": {
 		"build": "vite build",
 		"dev": "vite",
