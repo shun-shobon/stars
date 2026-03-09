@@ -2,21 +2,19 @@
  * 星空レンダラー初期化・レンダリング用カスタムフック
  */
 
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
-import { useCallback, useEffect, useRef } from "react";
+import { useAtomValue, useSetAtom } from "jotai";
+import { useEffect, useRef } from "react";
 
 import {
 	cameraAtom,
+	constellationDataAtom,
 	currentTimeAtom,
-	errorAtom,
-	isLoadingAtom,
-	loadingProgressAtom,
 	rendererAtom,
 	showConstellationsAtom,
+	starDataReadyAtom,
 } from "~/atoms";
 import { AUTO_ROTATE_SPEED } from "~/constants";
 import { store } from "~/lib/store";
-import { StarfieldRenderer } from "~/lib/webgpu/starfield";
 
 import { useCameraControls } from "./useCameraControls";
 
@@ -30,14 +28,15 @@ export interface UseStarfieldRendererResult {
 export function useStarfieldRenderer(): UseStarfieldRendererResult {
 	const canvasRef = useRef<HTMLCanvasElement | null>(null);
 	const animationFrameRef = useRef<number>(0);
+	const isAttachedRef = useRef(false);
 
-	// Jotai atoms - renderer state
-	const [renderer, setRenderer] = useAtom(rendererAtom);
+	// useAtomValueでPromise atomからデータ取得（Suspenseでawait）
+	const renderer = useAtomValue(rendererAtom);
+	const constellationData = useAtomValue(constellationDataAtom);
+	useAtomValue(starDataReadyAtom);
+
+	// Jotai atoms
 	const setCamera = useSetAtom(cameraAtom);
-	const setIsLoading = useSetAtom(isLoadingAtom);
-	const setLoadingProgress = useSetAtom(loadingProgressAtom);
-	const setError = useSetAtom(errorAtom);
-	const error = useAtomValue(errorAtom);
 	const showConstellations = useAtomValue(showConstellationsAtom);
 
 	// カメラ制御フック
@@ -52,36 +51,17 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 		isInteractingRef,
 	} = useCameraControls({ canvasRef });
 
-	// 進捗コールバック
-	const handleProgress = useCallback(
-		(progress: number) => {
-			setLoadingProgress(progress);
-		},
-		[setLoadingProgress],
-	);
-
-	// 初期化
+	// canvas接続とデータセットアップ
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
 
-		const newRenderer = new StarfieldRenderer();
+		// canvas接続（sync）
+		renderer.attachCanvas(canvas);
+		isAttachedRef.current = true;
 
-		const init = async (): Promise<void> => {
-			try {
-				await newRenderer.init(canvas);
-				setRenderer(newRenderer);
-				await newRenderer.loadStarData(handleProgress);
-				setIsLoading(false);
-			} catch (error_) {
-				setError(
-					error_ instanceof Error ? error_.message : "初期化に失敗しました",
-				);
-				setIsLoading(false);
-			}
-		};
-
-		void init();
+		// 星座データをGPUバッファに転送（sync、既存の場合はスキップ）
+		renderer.setConstellationData(constellationData);
 
 		// イベントリスナー登録
 		canvas.addEventListener("mousedown", handleMouseDown);
@@ -100,10 +80,14 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 			canvas.removeEventListener("touchstart", handleTouchStart);
 			canvas.removeEventListener("touchmove", handleTouchMove);
 			canvas.removeEventListener("touchend", handleTouchEnd);
-			newRenderer.dispose();
-			setRenderer(null);
+			// StrictMode対応: disposeではなくdetachCanvasを使用
+			// リソースは破棄せずcanvas参照のみクリア
+			renderer.detachCanvas();
+			isAttachedRef.current = false;
 		};
 	}, [
+		renderer,
+		constellationData,
 		handleMouseDown,
 		handleMouseMove,
 		handleMouseUp,
@@ -111,20 +95,16 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 		handleTouchStart,
 		handleTouchMove,
 		handleTouchEnd,
-		handleProgress,
-		setRenderer,
-		setIsLoading,
-		setError,
 	]);
 
 	// 星座線表示の同期
 	useEffect(() => {
-		renderer?.setConstellationVisibility(showConstellations);
+		renderer.setConstellationVisibility(showConstellations);
 	}, [renderer, showConstellations]);
 
 	// レンダリングループ
 	useEffect(() => {
-		if (!renderer || error) return;
+		if (!isAttachedRef.current) return;
 
 		let lastTime = performance.now();
 
@@ -155,7 +135,7 @@ export function useStarfieldRenderer(): UseStarfieldRendererResult {
 		return () => {
 			cancelAnimationFrame(animationFrameRef.current);
 		};
-	}, [renderer, error, isInteractingRef]);
+	}, [renderer, isInteractingRef, setCamera]);
 
 	return {
 		canvasRef,
