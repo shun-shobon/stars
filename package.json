@@ -29,7 +29,7 @@
 		"tailwindcss": "4.2.1"
 	},
 	"devDependencies": {
-		"@cloudflare/vite-plugin": "1.27.0",
+		"@cloudflare/vite-plugin": "1.28.0",
 		"@shun-shobon/style-guide": "2.2.4",
 		"@tailwindcss/vite": "4.2.1",
 		"@tsconfig/strictest": "2.0.8",
