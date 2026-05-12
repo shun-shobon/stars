@@ -26,12 +26,12 @@
 		"jotai": "2.20.0",
 		"react": "19.2.6",
 		"react-dom": "19.2.6",
-		"tailwindcss": "4.2.4"
+		"tailwindcss": "4.3.0"
 	},
 	"devDependencies": {
 		"@cloudflare/vite-plugin": "1.36.3",
 		"@shun-shobon/style-guide": "2.2.4",
-		"@tailwindcss/vite": "4.2.4",
+		"@tailwindcss/vite": "4.3.0",
 		"@tsconfig/strictest": "2.0.8",
 		"@tsconfig/vite-react": "7.0.2",
 		"@types/node": "24.12.3",
