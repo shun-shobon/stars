@@ -37,7 +37,7 @@
 		"@types/node": "24.13.3",
 		"@types/react": "19.2.17",
 		"@types/react-dom": "19.2.3",
-		"@vitejs/plugin-react": "5.2.0",
+		"@vitejs/plugin-react": "6.1.1",
 		"@webgpu/types": "0.1.72",
 		"babel-plugin-react-compiler": "1.0.0",
 		"eslint": "9.39.5",
