@@ -8,3 +8,4 @@ export {
 	LoadingIndicator,
 	type LoadingIndicatorProps,
 } from "./LoadingIndicator";
+export { SuspenseLoadingIndicator } from "./SuspenseLoadingIndicator";
