@@ -37,8 +37,8 @@ importers:
         specifier: 2.0.8
         version: 2.0.8
       '@tsconfig/vite-react':
-        specifier: 7.0.2
-        version: 7.0.2
+        specifier: 8.1.1
+        version: 8.1.1
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3
@@ -1313,8 +1313,8 @@ packages:
   '@tsconfig/strictest@2.0.8':
     resolution: {integrity: sha512-XnQ7vNz5HRN0r88GYf1J9JJjqtZPiHt2woGJOo2dYqyHGGcd6OLGqSlBB6p1j9mpzja6Oe5BoPqWmeDx6X9rLw==}
 
-  '@tsconfig/vite-react@7.0.2':
-    resolution: {integrity: sha512-lEj4y5SPRcH+bjw0tyuxrEnPqQUwfQzBKgd1YamD9xyet9zLwh2gwy5F8w/Nxg5DjdgYVjjKo5aLJUf0BTDz4w==}
+  '@tsconfig/vite-react@8.1.1':
+    resolution: {integrity: sha512-TdLtRE9INt7aupEC2yhem6y4RN8T+B4oa2OUYsay0ioxSDl8Q4yaq0k2yc86Gb2BEHjKp4RUxgIzqOTk4IQ8dQ==}
 
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
@@ -4405,7 +4405,7 @@ snapshots:
 
   '@tsconfig/strictest@2.0.8': {}
 
-  '@tsconfig/vite-react@7.0.2': {}
+  '@tsconfig/vite-react@8.1.1': {}
 
   '@tybys/wasm-util@0.10.1':
     dependencies:
