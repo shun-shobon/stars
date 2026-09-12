@@ -34,20 +34,10 @@ import type { SkylineResources } from "./skyline";
 import { createSkylineTexture, destroySkylineTexture } from "./skyline";
 import type { RenderTextures } from "./textures";
 import { createRenderTextures, destroyRenderTextures } from "./textures";
-import type {
-	CameraState,
-	HdrConfig,
-	LoadProgressCallback,
-	StarfieldMeta,
-} from "./types";
+import type { CameraState, HdrConfig, StarfieldMeta } from "./types";
 
 // 型を再エクスポート
-export type {
-	CameraState,
-	HdrConfig,
-	LoadProgressCallback,
-	StarfieldMeta,
-} from "./types";
+export type { CameraState, HdrConfig, StarfieldMeta } from "./types";
 
 /**
  * HDR対応を検出する
@@ -86,6 +76,7 @@ export class StarfieldRenderer {
 
 	private starCount = 0;
 	private loadedStarCount = 0;
+	private starLoadPromise: Promise<void> | null = null;
 	private meta: StarfieldMeta | null = null;
 	private canvas: HTMLCanvasElement | null = null;
 
@@ -94,9 +85,13 @@ export class StarfieldRenderer {
 		toneMappingMode: 0,
 	};
 
-	async init(canvas: HTMLCanvasElement): Promise<void> {
-		this.canvas = canvas;
+	// HDR検出結果を保持（initDeviceで検出、attachCanvasで使用）
+	private hasHdrDisplay = false;
 
+	/**
+	 * WebGPUデバイスを初期化する（canvas不要な部分） Promise atomでキャッシュ可能
+	 */
+	async initDevice(): Promise<void> {
 		// eslint-disable-next-line typescript/no-unnecessary-condition -- navigator.gpu may be undefined in non-supporting browsers
 		if (!navigator.gpu) {
 			throw new Error("WebGPUがサポートされていません");
@@ -109,18 +104,13 @@ export class StarfieldRenderer {
 
 		this.device = await adapter.requestDevice();
 
-		this.context = canvas.getContext("webgpu");
-		if (!this.context) {
-			throw new Error("WebGPUコンテキストの取得に失敗しました");
-		}
-
 		this.format = navigator.gpu.getPreferredCanvasFormat();
 
-		// HDR対応を試行
-		this.hdrConfig = this.configureCanvasWithHdr();
+		// HDR対応を検出（CSS Media Queryのみ、canvasは不要）
+		this.hasHdrDisplay = detectHdrSupport();
 
 		// HDR有効時はキャンバスフォーマットを更新
-		const canvasFormat = this.hdrConfig.enabled ? "rgba16float" : this.format;
+		const canvasFormat = this.hasHdrDisplay ? "rgba16float" : this.format;
 
 		// サンプラー作成
 		this.sampler = this.device.createSampler({
@@ -141,6 +131,37 @@ export class StarfieldRenderer {
 			size: UNIFORM_BUFFER_SIZE,
 			usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
 		});
+
+		// 星データバッファを初期化（canvas不要）
+		this.ensureStarBuffer();
+	}
+
+	/**
+	 * CanvasをアタッチしてWebGPUコンテキストを設定する useEffect内で呼び出す（同期処理）
+	 */
+	attachCanvas(canvas: HTMLCanvasElement): void {
+		if (!this.device) {
+			throw new Error("initDevice()を先に呼び出してください");
+		}
+
+		this.canvas = canvas;
+
+		this.context = canvas.getContext("webgpu");
+		if (!this.context) {
+			throw new Error("WebGPUコンテキストの取得に失敗しました");
+		}
+
+		// HDR対応でキャンバスを設定
+		this.hdrConfig = this.configureCanvasWithHdr();
+	}
+
+	/**
+	 * Canvasをデタッチする（リソースは破棄しない） StrictMode対応: cleanupでdisposeの代わりに呼び出す
+	 */
+	detachCanvas(): void {
+		// contextのunconfigureは不要（次のattachCanvasで再設定される）
+		this.context = null;
+		this.canvas = null;
 	}
 
 	/**
@@ -151,9 +172,7 @@ export class StarfieldRenderer {
 			return { enabled: false, toneMappingMode: 0 };
 		}
 
-		const hasHdrDisplay = detectHdrSupport();
-
-		if (hasHdrDisplay) {
+		if (this.hasHdrDisplay) {
 			try {
 				// HDR設定を試行（rgba16float + extended toneMapping）
 				// WebGPU仕様では toneMapping: { mode: "extended" } でHDR出力可能
@@ -229,9 +248,17 @@ export class StarfieldRenderer {
 		);
 	}
 
-	async loadStarData(onProgress?: LoadProgressCallback): Promise<void> {
+	/**
+	 * 星データバッファを初期化する（内部用）
+	 */
+	private ensureStarBuffer(): void {
 		if (!this.device || !this.pipelines || !this.uniformBuffer) {
-			throw new Error("レンダラーが初期化されていません");
+			throw new Error("initDevice()を先に呼び出してください");
+		}
+
+		// 既にセットアップ済みの場合はスキップ（StrictMode対応）
+		if (this.starBuffer) {
+			return;
 		}
 
 		// メタデータ（importから取得）
@@ -240,7 +267,7 @@ export class StarfieldRenderer {
 
 		const totalBytes = this.starCount * BYTES_PER_STAR;
 
-		// 星データバッファを事前に最大サイズで作成
+		// 星データバッファを作成
 		this.starBuffer = this.device.createBuffer({
 			size: totalBytes,
 			usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -256,78 +283,112 @@ export class StarfieldRenderer {
 				},
 			],
 		});
-
-		// ストリーミング読み込み
-		const dataResponse = await fetch("/stars.bin");
-		if (!dataResponse.body) {
-			throw new Error("ストリーム読み込みがサポートされていません");
-		}
-
-		const reader = dataResponse.body.getReader();
-		let receivedBytes = 0;
-		let pendingBuffer = new Uint8Array(0);
-
-		while (true) {
-			const { done, value } = await reader.read();
-
-			if (done) {
-				break;
-			}
-
-			// 前回の残りと今回のチャンクを結合
-			const combined = new Uint8Array(pendingBuffer.length + value.length);
-			combined.set(pendingBuffer);
-			combined.set(value, pendingBuffer.length);
-
-			// 16バイト境界で処理
-			const alignedBytes =
-				Math.floor(combined.length / BYTES_PER_STAR) * BYTES_PER_STAR;
-
-			if (alignedBytes > 0) {
-				// GPUバッファに書き込み
-				const alignedData = combined.slice(0, alignedBytes);
-				this.device.queue.writeBuffer(
-					this.starBuffer,
-					receivedBytes,
-					alignedData,
-				);
-
-				receivedBytes += alignedBytes;
-				this.loadedStarCount = receivedBytes / BYTES_PER_STAR;
-
-				// 進捗コールバック
-				if (onProgress) {
-					const progress = Math.round((receivedBytes / totalBytes) * 100);
-					onProgress(progress, this.loadedStarCount);
-				}
-			}
-
-			// 余りを保持
-			pendingBuffer = combined.slice(alignedBytes);
-		}
-
-		// 残りのデータがあれば処理（通常はないはず）
-		if (pendingBuffer.length > 0) {
-			console.warn(
-				`未処理のデータが残っています: ${pendingBuffer.length.toString()} bytes`,
-			);
-		}
-
-		// 読み込み完了
-		this.loadedStarCount = this.starCount;
-		if (onProgress) {
-			onProgress(100, this.loadedStarCount);
-		}
-
-		// 星座線データも読み込み
-		await this.loadConstellationData();
 	}
 
 	/**
-	 * 星座線データを読み込む
+	 * Readerからストリーミングで星データを読み込む 進捗コールバックで進捗を通知
 	 */
-	private async loadConstellationData(): Promise<void> {
+	async loadStarDataFromReader(
+		reader: ReadableStreamDefaultReader<Uint8Array>,
+		onProgress?: (progress: number) => void,
+	): Promise<void> {
+		this.ensureStarBuffer();
+
+		if (this.starLoadPromise) {
+			return this.starLoadPromise;
+		}
+
+		// 既に読み込み完了している場合はスキップ（StrictMode対応）
+		if (this.loadedStarCount >= this.starCount) {
+			if (onProgress) {
+				onProgress(100);
+			}
+			return;
+		}
+
+		const loadPromise = (async () => {
+			if (!this.device || !this.starBuffer) {
+				throw new Error("initDevice()を先に呼び出してください");
+			}
+
+			const totalBytes = this.starCount * BYTES_PER_STAR;
+			let receivedBytes = 0;
+			let pendingBuffer = new Uint8Array(0);
+
+			while (true) {
+				const { done, value } = await reader.read();
+
+				if (done) {
+					break;
+				}
+
+				// 前回の残りと今回のチャンクを結合
+				const combined = new Uint8Array(pendingBuffer.length + value.length);
+				combined.set(pendingBuffer);
+				combined.set(value, pendingBuffer.length);
+
+				// 16バイト境界で処理
+				const alignedBytes =
+					Math.floor(combined.length / BYTES_PER_STAR) * BYTES_PER_STAR;
+
+				if (alignedBytes > 0) {
+					// GPUバッファに書き込み
+					const alignedData = combined.slice(0, alignedBytes);
+					this.device.queue.writeBuffer(
+						this.starBuffer,
+						receivedBytes,
+						alignedData,
+					);
+
+					receivedBytes += alignedBytes;
+					this.loadedStarCount = receivedBytes / BYTES_PER_STAR;
+
+					// 進捗コールバック
+					if (onProgress) {
+						const progress = Math.round((receivedBytes / totalBytes) * 100);
+						onProgress(progress);
+					}
+				}
+
+				// 余りを保持
+				pendingBuffer = combined.slice(alignedBytes);
+			}
+
+			// 残りのデータがあれば処理（通常はないはず）
+			if (pendingBuffer.length > 0) {
+				console.warn(
+					`未処理のデータが残っています: ${pendingBuffer.length.toString()} bytes`,
+				);
+			}
+
+			// 読み込み完了
+			this.loadedStarCount = this.starCount;
+			if (onProgress) {
+				onProgress(100);
+			}
+		})();
+
+		this.starLoadPromise = loadPromise;
+
+		try {
+			await loadPromise;
+		} finally {
+			if (this.starLoadPromise === loadPromise) {
+				this.starLoadPromise = null;
+			}
+		}
+	}
+
+	/**
+	 * 星座線データをGPUバッファに設定する 事前にfetchしたArrayBufferを受け取る
+	 */
+	setConstellationData(data: ArrayBuffer): void {
 		if (!this.device || !this.pipelines || !this.uniformBuffer) {
+			throw new Error("initDevice()を先に呼び出してください");
+		}
+
+		// 既にセットアップ済みの場合はスキップ（StrictMode対応）
+		if (this.constellationBuffer) {
 			return;
 		}
 
@@ -358,19 +419,12 @@ export class StarfieldRenderer {
 			],
 		});
 
-		// 星座線バイナリを読み込み
-		try {
-			const response = await fetch("/constellations.bin");
-			const arrayBuffer = await response.arrayBuffer();
-			this.device.queue.writeBuffer(
-				this.constellationBuffer,
-				0,
-				new Uint8Array(arrayBuffer),
-			);
-		} catch (error) {
-			console.warn("星座線データの読み込みに失敗しました:", error);
-			this.constellationLineCount = 0;
-		}
+		// GPUバッファにデータを書き込み
+		this.device.queue.writeBuffer(
+			this.constellationBuffer,
+			0,
+			new Uint8Array(data),
+		);
 	}
 
 	/**
