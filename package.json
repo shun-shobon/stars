@@ -41,7 +41,7 @@
 		"@webgpu/types": "0.1.74",
 		"babel-plugin-react-compiler": "1.0.0",
 		"eslint": "9.39.5",
-		"prettier": "3.9.6",
+		"prettier": "3.9.9",
 		"tsx": "4.23.13",
 		"typescript": "5.9.3",
 		"vite": "7.3.6",
