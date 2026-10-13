@@ -22,7 +22,7 @@
 		"typegen": "wrangler types"
 	},
 	"dependencies": {
-		"@base-ui/react": "1.8.0",
+		"@base-ui/react": "1.9.0",
 		"jotai": "2.20.3",
 		"react": "19.3.0",
 		"react-dom": "19.3.0",
