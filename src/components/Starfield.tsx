@@ -10,6 +10,7 @@ import {
 	currentTimeAtom,
 	isDatePickerOpenAtom,
 	isRealtimeModeAtom,
+	loadingProgressAtom,
 	showConstellationsAtom,
 	showHintsAtom,
 } from "~/atoms";
@@ -21,11 +22,10 @@ import {
 	StarfieldHeader,
 	StarfieldHints,
 } from "./starfield-ui";
-import { ErrorPanel, LoadingIndicator } from "./ui";
+import { LoadingIndicator } from "./ui";
 
 const Starfield: FC = () => {
-	const { canvasRef, camera, isLoading, loadingProgress, error } =
-		useStarfield();
+	const { canvasRef, camera } = useStarfield();
 
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -38,6 +38,10 @@ const Starfield: FC = () => {
 	const currentTime = useAtomValue(currentTimeAtom);
 	const setCurrentTime = useSetAtom(currentTimeAtom);
 	const setRealtimeMode = useSetAtom(isRealtimeModeAtom);
+	const loadingProgress = useAtomValue(loadingProgressAtom);
+
+	// ストリーミング読み込み中かどうか
+	const isLoading = loadingProgress < 100;
 
 	// 操作ヒントを一定時間後に非表示
 	useEffect(() => {
@@ -100,11 +104,6 @@ const Starfield: FC = () => {
 		};
 	}, [canvasRef]);
 
-	// エラー表示
-	if (error) {
-		return <ErrorPanel message={error} />;
-	}
-
 	return (
 		<div ref={containerRef} className="bg-cosmic-void relative h-svh w-svw">
 			{/* 星空キャンバス */}
@@ -114,7 +113,7 @@ const Starfield: FC = () => {
 				aria-label="東京からの星空表示。ドラッグで視点移動、ホイールでズーム"
 			/>
 
-			{/* ローディング表示 */}
+			{/* ストリーミング読み込み中の進捗表示 */}
 			{isLoading && <LoadingIndicator progress={loadingProgress} />}
 
 			{/* ヘッダーパネル */}
