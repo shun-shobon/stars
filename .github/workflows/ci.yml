@@ -1,62 +1,100 @@
-name: ci
+# This workflow is managed by gh actions-lock.
+name: CI
+
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
-  lint:
-    runs-on: ubuntu-slim
-    timeout-minutes: 10
-    steps:
-      - name: Setup | Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-
-      - name: Setup | Node.js
-        uses: ./.github/actions/setup-node
-
-      - name: Run | Lint
-        run: pnpm run lint
-
   format:
     runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
       - name: Setup | Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        uses: actions/checkout@v7.0.1
 
-      - name: Setup | Node.js
-        uses: ./.github/actions/setup-node
+      - name: Setup | Development environment
+        uses: $/.github/actions/setup
 
-      - name: Run | Format
+      - name: Run | Format check
         run: pnpm run format:check
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup | Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup | Development environment
+        uses: $/.github/actions/setup
+
+      - name: Run | Lint
+        run: pnpm run lint --deny-warnings
+
+  knip:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    steps:
+      - name: Setup | Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup | Development environment
+        uses: $/.github/actions/setup
+
+      - name: Run | Knip
+        run: pnpm run knip
 
   typecheck:
     runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
       - name: Setup | Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        uses: actions/checkout@v7.0.1
 
-      - name: Setup | Node.js
-        uses: ./.github/actions/setup-node
+      - name: Setup | Development environment
+        uses: $/.github/actions/setup
 
       - name: Run | Typecheck
         run: pnpm run typecheck
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup | Checkout
+        uses: actions/checkout@v7.0.1
+
+      - name: Setup | Development environment
+        uses: $/.github/actions/setup
+
+      - name: Run | Test
+        run: pnpm run test
 
   build:
     runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
       - name: Setup | Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        uses: actions/checkout@v7.0.1
 
-      - name: Setup | Node.js
-        uses: ./.github/actions/setup-node
+      - name: Setup | Development environment
+        uses: $/.github/actions/setup
 
-      - name: Run | Build
+      - name: Build | Vite
         run: pnpm run build
+
+  status-check:
+    needs: [format, lint, knip, typecheck, test, build]
+    if: ${{ always() }}
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Verify | All CI jobs succeeded
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: jq -e 'all(.[]; . == "success")' <<< "$RESULTS"
