@@ -1,267 +1,56 @@
-# Agent Guidelines for Stars Project
+# AGENTS.md
 
-このドキュメントは、AIコーディングエージェントがこのリポジトリで作業する際の指針を提供します。
+東京から見た星空を WebGPU で描く Web アプリ。Cloudflare Workers の静的アセットとして配信する。
 
-## プロジェクト概要
+## 開発コマンド
 
-WebGPUを使用した星空レンダリングWebアプリケーション。東京からの星空をリアルタイムで表示し、ドラッグ操作で視点を変更できます。
-
-**技術スタック:**
-
-- React 19.2.3
-- TypeScript 5.9.3
-- Vite 7.3.1 (ビルドツール)
-- Tailwind CSS 4.1.18
-- WebGPU API
-- pnpm (パッケージマネージャー)
-
-## ビルド・開発コマンド
+Node.js と pnpm は `mise.toml` で固定している。`mise install` の後に `pnpm install` する。
 
 ```bash
-# 開発サーバー起動
-pnpm dev
-
-# プロダクションビルド
-pnpm build
-
-# 型チェック
-pnpm typecheck
-
-# リント実行
-pnpm lint
-
-# リント自動修正
-pnpm lint:fix
-
-# フォーマット実行
-pnpm format
-
-# フォーマットチェック
-pnpm format:check
+pnpm dev            # 開発サーバー
+pnpm build          # 本番ビルド
+pnpm preview        # ビルド結果を workerd で確認
+pnpm test           # Vitest
+pnpm typecheck      # src・worker・スクリプトと設定ファイルの3つの tsconfig を検査
+pnpm lint           # Oxlint（pnpm lint:fix で自動修正）
+pnpm format         # Oxfmt（pnpm format:check で検査のみ）
+pnpm knip           # 未使用のファイル・export・依存の検出
+pnpm gen:catalog    # data/ の CSV から星カタログを再生成
+pnpm typegen        # wrangler.toml を変えたら Worker の型を再生成
 ```
 
-**注意:** このプロジェクトにはテストフレームワークが含まれていません。
-
-## コードスタイルガイドライン
-
-### 1. インポート
-
-**順序:**
-
-1. type インポート（`import type`）
-2. 外部ライブラリ
-3. 内部モジュール（`~/`エイリアス使用）
-
-**パスエイリアス:**
-
-- `~/` - `src/` ディレクトリを指す
-- 例: `import { useStarfield } from "~/hooks/useStarfield"`
-
-**例:**
-
-```typescript
-import type { FC } from "react";
-import { useEffect, useRef } from "react";
-
-import { useStarfield } from "~/hooks/useStarfield";
-```
-
-### 2. TypeScript
-
-**厳格な型付け:**
-
-- `@tsconfig/strictest` を使用
-- `any` 型の使用を避ける
-- すべての関数に戻り値の型を明示
-- interface よりも type を優先（必要に応じて使い分け）
-
-**型定義の例:**
-
-```typescript
-export interface StarfieldMeta {
-	starCount: number;
-	minMagnitude: number;
-	maxMagnitude: number;
-}
-
-export function useStarfield(): UseStarfieldResult {
-	// implementation
-}
-```
-
-**ESLintディレクティブの使用:**
-必要な場合のみESLintルールを無効化し、理由をコメントで明記：
-
-```typescript
-// eslint-disable-next-line typescript/no-unnecessary-condition -- navigator.gpu may be undefined in non-supporting browsers
-if (!navigator.gpu) {
-	throw new Error("WebGPUがサポートされていません");
-}
-```
-
-### 3. フォーマット
-
-**Prettier設定:**
-
-- `@shun-shobon/style-guide/prettier` を使用
-- タブ幅: 2スペース
-- セミコロン: あり
-- クォート: ダブルクォート
-
-**保存時のフォーマット:** コードを変更した後は必ず `pnpm format`
-を実行してください。
-
-### 4. 命名規則
-
-**変数・関数:**
-
-- camelCase を使用
-- boolean値は `is`, `has`, `should` などの接頭辞
-- 例: `isLoading`, `hasError`, `shouldRender`
-
-**コンポーネント:**
-
-- PascalCase を使用
-- ファイル名とコンポーネント名を一致させる
-- 例: `Starfield.tsx` → `const Starfield: FC = () => {}`
-
-**定数:**
-
-- UPPER_SNAKE_CASE を使用
-- 例: `TOKYO_LATITUDE`, `TOKYO_LONGITUDE`
-
-**型・インターフェース:**
-
-- PascalCase を使用
-- Props型は `ComponentNameProps` の形式
-- Result型は `useFunctionNameResult` の形式
-
-### 5. React
-
-**コンポーネント定義:**
-
-```typescript
-import type { FC } from "react";
-
-const ComponentName: FC = () => {
-	return <div>Content</div>;
-};
-
-export default ComponentName;
-```
-
-**Hooks:**
-
-- カスタムフックは `use` で始める
-- 戻り値の型を明示
-- `useCallback`, `useMemo` を適切に使用してパフォーマンス最適化
-
-**Ref の使用:**
-
-```typescript
-const canvasRef = useRef<HTMLCanvasElement | null>(null);
-```
-
-### 6. エラーハンドリング
-
-**非同期処理:**
-
-```typescript
-try {
-	await renderer.init(canvas);
-	await renderer.loadStarData();
-	setIsLoading(false);
-} catch (error_) {
-	setError(error_ instanceof Error ? error_.message : "初期化に失敗しました");
-	setIsLoading(false);
-}
-```
-
-**エラーメッセージ:**
-
-- 日本語でユーザーフレンドリーなメッセージを提供
-- 開発者向けの詳細情報も含める
-
-**nullチェック:**
-
-```typescript
-const canvas = canvasRef.current;
-if (!canvas) return;
-```
-
-### 7. コメント
-
-**JSDoc形式:**
-
-```typescript
-/**
- * 星空表示コンポーネント
- */
-```
-
-**日本語コメント:**
-
-- このプロジェクトでは日本語コメントを使用
-- 複雑なロジックには説明を追加
-
-### 8. ファイル構成
+## ディレクトリ構成
 
 ```
 src/
-├── components/     # Reactコンポーネント
-├── constants/      # 定数定義
-├── data/           # データファイル（JSON）
-├── hooks/          # カスタムフック
-├── lib/            # ユーティリティ・ライブラリ
-│   └── webgpu/     # WebGPU関連コード
-├── index.tsx       # エントリーポイント
-├── styles.css      # グローバルスタイル
-└── worker.ts       # Web Worker
+├── domain/     天体・カメラ・投影の計算と、星カタログのバイナリ形式。DOM・WebGPU・React に依存しない
+├── catalog/    星カタログの取得と検証。catalog-meta.json は生成物
+├── renderer/   WebGPU による描画。WGSL は shaders/ に置く
+├── viewer/     描画ループ、カメラの状態と入力、canvas の解像度
+├── ui/         React のコンポーネント
+└── main.tsx
+worker/         Cloudflare Worker。/api/* だけを処理し、それ以外は静的アセットを返す
+scripts/        node で直接実行するスクリプト
+data/           星カタログの元データ（Hipparcos 星表と星座線の CSV）
+public/         配信する静的ファイル。stars.bin と constellations.bin は生成物
 ```
 
-### 9. スタイリング
+依存の向きは `ui → viewer → renderer・catalog → domain` で、右側にだけ依存する（間を飛ばしてもよい）。逆向きの import と、レイヤーをまたぐ相対パスの import は `pnpm lint` がエラーにする。レイヤーをまたぐ import は `~/` から書く。
 
-**Tailwind CSS:**
+`tsconfig.json` はディレクトリごとに置き、ファイルから最も近いものが効く。ルートは Node.js で動く設定ファイルとスクリプト、`src/` はブラウザー、`worker/` は Workers の実行環境向け。
 
-- ユーティリティクラスを使用
-- カスタムCSSは最小限に
-- レスポンシブデザインを考慮
+## 設計の判断基準
 
-**例:**
+- カメラや方位ラベルの位置のように毎フレーム変わる値は React の state にしない。viewer が持ち、ラベルは `subscribeFrame` で DOM を直接動かす。
+- 時刻は `Temporal.Instant` で扱い、表示と入力は `domain/observer.ts` の観測地のタイムゾーンを通す。WebGPU と Temporal に対応しないブラウザーには代替の経路を作らず、エラーを表示する。
+- シェーダーの uniform は `renderer/shaders/shared.wgsl.ts` の `Scene` 構造体1つにまとめる。フィールドを変えるときは `renderer/scene-uniforms.ts` の詰め順とサイズを合わせる。パイプラインごとに決まる値は override 定数か WGSL の `const` にし、uniform を増やさない。
+- 星カタログのバイナリ形式は `domain/catalog-format.ts` を基準に、生成スクリプト・読み込み・シェーダーの頂点入力をそろえ、`pnpm gen:catalog` で再生成する。読み込みの途中でも明るい星から現れるよう、星は明るい順に並べる。
+- 利用者に見せる文言は日本語、エラーメッセージとログは英語で書く。エラーは `ui/describe-error.ts` で利用者向けの説明に変える。
 
-```typescript
-<div className="flex h-screen w-screen items-center justify-center bg-gray-900">
-	<div className="rounded-lg bg-red-900/50 p-6 text-center">
-		<h2 className="mb-2 text-xl font-bold text-red-300">エラー</h2>
-	</div>
-</div>;
-```
+## テスト
 
-## CI/CD
+`domain` の計算と、`catalog` の読み込みのような外部との接続点を Vitest で検証する。WebGPU の描画はテストで確かめられないので、描画やシェーダーを変えたらブラウザーで表示を確認する。
 
-GitHub Actionsで以下をチェック:
+## コミット
 
-- `pnpm run lint`
-- `pnpm run format:check`
-- `pnpm run typecheck`
-- `pnpm run build`
-
-コミット前にすべてのチェックが通ることを確認してください。
-
-## 重要な注意事項
-
-1. **WebGPU互換性**:
-   WebGPUが未サポートのブラウザに対してエラーハンドリングを実装
-2. **パフォーマンス**: requestAnimationFrame を使用したレンダリングループ
-3. **メモリ管理**: WebGPUリソース（buffer, texture等）は適切にdispose
-4. **アクセシビリティ**: canvasにaria-labelを追加
-
-## コミットメッセージ
-
-簡潔で明確な日本語または英語のコミットメッセージを使用してください。
-
-**例:**
-
-- `feat: 星の輝度計算を改善`
-- `fix: タッチ操作時のドラッグ動作を修正`
-- `refactor: WebGPUパイプライン初期化を整理`
+Conventional Commits の `<type>: <日本語の件名>` で、1コミットに1つの目的を持たせる。
