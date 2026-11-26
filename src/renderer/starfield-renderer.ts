@@ -4,6 +4,7 @@ import type { ViewBasis } from "~/domain/view";
 
 import type { GpuCanvas } from "./gpu-canvas";
 import { GpuDeviceLostError, GpuValidationError, setUpGpuCanvas } from "./gpu-canvas";
+import { MilkyWayAtlas } from "./milky-way-atlas";
 import type { Pipelines } from "./pipelines";
 import { createPipelines } from "./pipelines";
 import type { RenderTargets } from "./render-targets";
@@ -30,6 +31,7 @@ export type RenderFrame = {
 	view: ViewBasis;
 	localSiderealTime: number;
 	areConstellationsVisible: boolean;
+	isMilkyWayVisible: boolean;
 };
 
 export async function createStarfieldRenderer(
@@ -44,8 +46,10 @@ export async function createStarfieldRenderer(
 /**
  * 背景、星座線、星をオフスクリーンに描き、ブルームとトーンマップをかけて canvas に出す。
  * 星と星座線のレコードは読み込みの進みに合わせて後から書き込み、書き込んだ分だけ描く。
+ * 天の川は背景に描き、タイルは milkyWayAtlas に届いたものから使う。
  */
 export class StarfieldRenderer {
+	readonly milkyWayAtlas: MilkyWayAtlas;
 	readonly #canvas: HTMLCanvasElement;
 	readonly #device: GPUDevice;
 	readonly #context: GPUCanvasContext;
@@ -59,6 +63,7 @@ export class StarfieldRenderer {
 	>;
 	readonly #starBuffer: GPUBuffer;
 	readonly #constellationBuffer: GPUBuffer;
+	readonly #milkyWayBindGroup: GPUBindGroup;
 	#renderTargets: RenderTargets | null = null;
 	#writtenStarCount = 0;
 	#writtenConstellationLineCount = 0;
@@ -126,6 +131,16 @@ export class StarfieldRenderer {
 			size: options.constellationLineCount * CONSTELLATION_LINE_RECORD_BYTES,
 			usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
 		});
+
+		this.milkyWayAtlas = new MilkyWayAtlas(device);
+		this.#milkyWayBindGroup = device.createBindGroup({
+			layout: this.#pipelines.background.getBindGroupLayout(1),
+			entries: [
+				{ binding: 0, resource: this.milkyWayAtlas.texture.createView({ dimension: "2d-array" }) },
+				{ binding: 1, resource: this.#sampler },
+				{ binding: 2, resource: { buffer: this.milkyWayAtlas.pageTable } },
+			],
+		});
 	}
 
 	/** 星のレコードを書き込む。先頭から途切れずに書き込まれた分を描画対象にする */
@@ -139,7 +154,12 @@ export class StarfieldRenderer {
 		this.#writtenConstellationLineCount = records.byteLength / CONSTELLATION_LINE_RECORD_BYTES;
 	}
 
-	render({ view, localSiderealTime, areConstellationsVisible }: RenderFrame): void {
+	render({
+		view,
+		localSiderealTime,
+		areConstellationsVisible,
+		isMilkyWayVisible,
+	}: RenderFrame): void {
 		const { width, height } = this.#canvas;
 		// レイアウト前など canvas の面積が 0 のときは描く先がない
 		if (width === 0 || height === 0) {
@@ -150,7 +170,7 @@ export class StarfieldRenderer {
 		this.#device.queue.writeBuffer(
 			this.#sceneBuffer,
 			0,
-			packSceneUniforms(view, OBSERVER.latitudeRad, localSiderealTime),
+			packSceneUniforms(view, OBSERVER.latitudeRad, localSiderealTime, isMilkyWayVisible ? 1 : 0),
 		);
 
 		const encoder = this.#device.createCommandEncoder();
@@ -159,6 +179,7 @@ export class StarfieldRenderer {
 		const backgroundPass = beginPass(encoder, targets.sceneView, "clear");
 		backgroundPass.setPipeline(pipelines.background);
 		backgroundPass.setBindGroup(0, this.#sceneBindGroups.background);
+		backgroundPass.setBindGroup(1, this.#milkyWayBindGroup);
 		backgroundPass.draw(FULLSCREEN_VERTEX_COUNT);
 		backgroundPass.end();
 
@@ -200,6 +221,7 @@ export class StarfieldRenderer {
 		this.#context.unconfigure();
 		this.#renderTargets?.destroy();
 		this.#skylineTexture.destroy();
+		this.milkyWayAtlas.destroy();
 		this.#sceneBuffer.destroy();
 		this.#starBuffer.destroy();
 		this.#constellationBuffer.destroy();

@@ -13,6 +13,8 @@ struct Scene {
   tanHalfFov: f32,
   projectionScale: f32,
   cullRadius: f32,
+  // 天の川の明るさに掛ける。非表示なら 0
+  milkyWayVisibility: f32,
 }
 
 @group(0) @binding(0) var<uniform> scene: Scene;
@@ -75,15 +77,15 @@ fn horizontalToClip(az: f32, alt: f32) -> vec4f {
 `;
 
 /**
- * 画面上の UV から、その画素が見ている天球上の地平座標を逆算する関数群。
+ * 画面上の UV から、その画素が見ている天球上の方向を逆算する関数群。
  */
 export const INVERSE_PROJECTION_WGSL = /* wgsl */ `
 fn cartesianToHorizontal(dir: vec3f) -> vec2f {
   return vec2f(atan2(dir.x, dir.z), asin(clamp(dir.y, -1.0, 1.0)));
 }
 
-// 戻り値は (方位角, 高度)
-fn uvToHorizontal(uv: vec2f) -> vec2f {
+// 地平座標の単位ベクトルを返す。domain/view.ts の screenToDirection と同じ計算
+fn uvToDirection(uv: vec2f) -> vec3f {
   let ndc = vec2f(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
   let rayDir = normalize(
     scene.right * (ndc.x * scene.aspect * scene.tanHalfFov) +
@@ -97,7 +99,12 @@ fn uvToHorizontal(uv: vec2f) -> vec2f {
   let c = dot(scene.cameraPosition, scene.cameraPosition) - 1.0;
   let t = -b + sqrt(b * b - c);
 
-  return cartesianToHorizontal(normalize(scene.cameraPosition + rayDir * t));
+  return normalize(scene.cameraPosition + rayDir * t);
+}
+
+// 戻り値は (方位角, 高度)
+fn uvToHorizontal(uv: vec2f) -> vec2f {
+  return cartesianToHorizontal(uvToDirection(uv));
 }
 `;
 

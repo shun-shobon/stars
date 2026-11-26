@@ -25,9 +25,9 @@ pnpm typegen        # wrangler.toml を変えたら Worker の型を再生成
 ```
 src/
 ├── domain/     天体・カメラ・投影の計算と、星カタログと天の川のタイルの形式。DOM・WebGPU・React に依存しない
-├── catalog/    星カタログの取得と検証。catalog-meta.json は生成物
+├── catalog/    星カタログと天の川のタイルの取得と検証。catalog-meta.json は生成物
 ├── renderer/   WebGPU による描画。WGSL は shaders/ に置く
-├── viewer/     描画ループ、カメラの状態と入力、canvas の解像度
+├── viewer/     描画ループ、カメラの状態と入力、canvas の解像度、天の川のタイルの読み込み
 ├── ui/         React のコンポーネント
 └── main.tsx
 worker/         Cloudflare Worker。/api/* だけを処理し、それ以外は静的アセットを返す
@@ -46,6 +46,7 @@ public/         配信する静的ファイル。stars.bin、constellations.bin�
 - 時刻は `Temporal.Instant` で扱い、表示と入力は `domain/observer.ts` の観測地のタイムゾーンを通す。WebGPU と Temporal に対応しないブラウザーには代替の経路を作らず、エラーを表示する。
 - シェーダーの uniform は `renderer/shaders/shared.wgsl.ts` の `Scene` 構造体1つにまとめる。フィールドを変えるときは `renderer/scene-uniforms.ts` の詰め順とサイズを合わせる。パイプラインごとに決まる値は override 定数か WGSL の `const` にし、uniform を増やさない。
 - 星カタログのバイナリ形式は `domain/catalog-format.ts` を基準に、生成スクリプト・読み込み・シェーダーの頂点入力をそろえ、`pnpm gen:catalog` で再生成する。読み込みの途中でも明るい星から現れるよう、星は明るい順に並べる。
+- 天の川は赤道座標の立方体の6面を4分木で分けたタイルで持ち、背景のパスが画素ごとに要るレベルを選んで引く。タイルの形式は `domain/milky-way-format.ts`、レベルの選び方は `domain/milky-way-tiles.ts` を基準に、生成スクリプトとシェーダーをそろえる。シェーダーの定数はこれらの TS の値から埋め込む。届いていないタイルは粗いレベルで代えて描く。
 - 利用者に見せる文言は日本語、エラーメッセージとログは英語で書く。エラーは `ui/describe-error.ts` で利用者向けの説明に変える。
 
 ## テスト

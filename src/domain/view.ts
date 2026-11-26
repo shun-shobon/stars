@@ -1,7 +1,7 @@
 import type { CameraState } from "./camera";
 import { MAX_FOV, MIN_FOV } from "./camera";
 import type { Vec3 } from "./vector";
-import { cross, dot, length, normalize, scale, subtract } from "./vector";
+import { add, cross, dot, length, normalize, scale, subtract } from "./vector";
 
 /**
  * 天球（半径1の単位球）を見るカメラの基底と投影パラメーター。
@@ -89,6 +89,29 @@ export function projectToScreen(
 		x >= -SCREEN_MARGIN && x <= 1 + SCREEN_MARGIN && y >= -SCREEN_MARGIN && y <= 1 + SCREEN_MARGIN;
 
 	return isNearScreen ? { x, y } : null;
+}
+
+/**
+ * 画面上の点が見ている天球上の方向を、地平座標の単位ベクトルで返す。shared.wgsl.ts の uvToDirection と同じ計算。
+ */
+export function screenToDirection(basis: ViewBasis, point: ScreenPoint): Vec3 {
+	const ndcX = point.x * 2 - 1;
+	const ndcY = 1 - point.y * 2;
+	const rayDir = normalize(
+		add(
+			add(
+				scale(basis.right, ndcX * basis.aspect * basis.tanHalfFov),
+				scale(basis.up, ndcY * basis.tanHalfFov),
+			),
+			basis.viewDir,
+		),
+	);
+
+	// カメラは天球の内側にあるので、視線と単位球の交点は前方に必ず1つある
+	const b = dot(basis.position, rayDir);
+	const c = dot(basis.position, basis.position) - 1;
+	const t = -b + Math.sqrt(b * b - c);
+	return normalize(add(basis.position, scale(rayDir, t)));
 }
 
 function horizontalToCartesian(azimuth: number, altitude: number): Vec3 {

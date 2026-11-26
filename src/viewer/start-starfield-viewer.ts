@@ -11,6 +11,8 @@ import { createStarfieldRenderer } from "~/renderer/starfield-renderer";
 
 import { attachCameraInput } from "./camera-input";
 import { trackCanvasResolution } from "./canvas-resolution";
+import type { MilkyWayTileStream } from "./milky-way-tile-stream";
+import { startMilkyWayTileStream } from "./milky-way-tile-stream";
 
 export type ObservationTime = { kind: "realtime" } | { kind: "fixed"; instant: Temporal.Instant };
 
@@ -20,6 +22,7 @@ export type LoadState = { kind: "loading"; progress: number } | { kind: "ready" 
 export type StarfieldViewer = {
 	setObservationTime: (time: ObservationTime) => void;
 	setConstellationsVisible: (isVisible: boolean) => void;
+	setMilkyWayVisible: (isVisible: boolean) => void;
 	/** 毎フレーム、描画に使ったカメラを受け取る。戻り値の関数で購読をやめる */
 	subscribeFrame: (listener: (view: ViewBasis) => void) => () => void;
 	dispose: () => void;
@@ -44,6 +47,7 @@ export function startStarfieldViewer({
 	let camera: CameraState = INITIAL_CAMERA;
 	let observationTime: ObservationTime = { kind: "realtime" };
 	let areConstellationsVisible = true;
+	let isMilkyWayVisible = true;
 	let renderer: StarfieldRenderer | null = null;
 	let animationFrameId = 0;
 
@@ -57,12 +61,17 @@ export function startStarfieldViewer({
 		},
 	});
 
+	// 失敗した後は描画も読み込みも続けない。エラーの表示に切り替わっても dispose は呼ばれない
 	const fail = (error: unknown): void => {
+		abortController.abort();
 		cancelAnimationFrame(animationFrameId);
 		onError(error);
 	};
 
-	const renderLoop = (activeRenderer: StarfieldRenderer): void => {
+	const renderLoop = (
+		activeRenderer: StarfieldRenderer,
+		milkyWayTiles: MilkyWayTileStream,
+	): void => {
 		let lastTimestamp = performance.now();
 
 		const renderFrame = (timestamp: number): void => {
@@ -76,10 +85,18 @@ export function startStarfieldViewer({
 			const instant =
 				observationTime.kind === "realtime" ? Temporal.Now.instant() : observationTime.instant;
 			const view = computeViewBasis(camera, canvas.width / canvas.height);
+			const siderealTime = localSiderealTime(instant, OBSERVER.longitudeDeg);
+			if (isMilkyWayVisible) {
+				milkyWayTiles.update(
+					{ view, widthPx: canvas.width, heightPx: canvas.height, localSiderealTime: siderealTime },
+					timestamp,
+				);
+			}
 			activeRenderer.render({
 				view,
-				localSiderealTime: localSiderealTime(instant, OBSERVER.longitudeDeg),
+				localSiderealTime: siderealTime,
 				areConstellationsVisible,
+				isMilkyWayVisible,
 			});
 			for (const listener of frameListeners) {
 				listener(view);
@@ -103,7 +120,14 @@ export function startStarfieldViewer({
 		}
 		renderer = createdRenderer;
 
-		renderLoop(createdRenderer);
+		renderLoop(
+			createdRenderer,
+			startMilkyWayTileStream({
+				atlas: createdRenderer.milkyWayAtlas,
+				signal: abortController.signal,
+				onError: fail,
+			}),
+		);
 
 		await streamStarRecords((records, byteOffset) => {
 			createdRenderer.writeStarRecords(records, byteOffset);
@@ -131,6 +155,9 @@ export function startStarfieldViewer({
 		},
 		setConstellationsVisible: (isVisible) => {
 			areConstellationsVisible = isVisible;
+		},
+		setMilkyWayVisible: (isVisible) => {
+			isMilkyWayVisible = isVisible;
 		},
 		subscribeFrame: (listener) => {
 			frameListeners.add(listener);
