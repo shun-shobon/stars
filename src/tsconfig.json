@@ -1,0 +1,14 @@
+{
+	"extends": ["@tsconfig/vite-react/tsconfig.json", "@tsconfig/strictest/tsconfig.json"],
+	"compilerOptions": {
+		"noEmit": true,
+		"exactOptionalPropertyTypes": false,
+		"verbatimModuleSyntax": true,
+		"types": ["vite/client", "@webgpu/types"],
+		"paths": {
+			"~/*": ["./*"]
+		},
+		"lib": ["ES2023", "DOM", "ESNext.Temporal"]
+	},
+	"include": ["."]
+}
