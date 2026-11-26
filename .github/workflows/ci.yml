@@ -37,7 +37,7 @@ jobs:
         run: pnpm run lint --deny-warnings
 
   knip:
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Setup | Checkout
