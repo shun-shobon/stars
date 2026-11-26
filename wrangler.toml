@@ -1,6 +1,6 @@
 name = "stars"
 compatibility_date = "2026-01-11"
-main = "src/worker.ts"
+main = "worker/index.ts"
 
 [observability]
 enabled = true

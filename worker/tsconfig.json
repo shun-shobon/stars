@@ -8,7 +8,7 @@
 		"noEmit": true,
 		"exactOptionalPropertyTypes": false,
 		"verbatimModuleSyntax": true,
-		"types": ["./worker-configuration.d.ts"]
+		"types": []
 	},
-	"include": ["src/worker.ts"]
+	"include": ["."]
 }

@@ -19,8 +19,8 @@
 		"lint:fix": "oxlint --fix",
 		"preview": "vite preview",
 		"test": "vitest run",
-		"typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.worker.json && tsc --noEmit -p tsconfig.node.json",
-		"typegen": "wrangler types"
+		"typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p src && tsc --noEmit -p worker",
+		"typegen": "wrangler types worker/worker-configuration.d.ts"
 	},
 	"dependencies": {
 		"jotai": "3.0.2",

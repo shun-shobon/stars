@@ -1,14 +1,14 @@
 {
-	"extends": ["@tsconfig/vite-react/tsconfig.json", "@tsconfig/strictest/tsconfig.json"],
+	"extends": ["@tsconfig/node-lts/tsconfig.json", "@tsconfig/strictest/tsconfig.json"],
 	"compilerOptions": {
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
 		"noEmit": true,
 		"exactOptionalPropertyTypes": false,
 		"verbatimModuleSyntax": true,
-		"types": ["vite/client", "@webgpu/types"],
-		"paths": {
-			"~/*": ["./src/*"]
-		}
+		"allowImportingTsExtensions": true,
+		"erasableSyntaxOnly": true,
+		"types": ["node"]
 	},
-	"include": ["src"],
-	"exclude": ["src/worker.ts"]
+	"include": ["*.config.ts", "scripts"]
 }
