@@ -240,6 +240,9 @@ importers:
       oxlint-tsgolint:
         specifier: 7.0.2008
         version: 7.0.2008
+      sharp:
+        specifier: 0.35.5
+        version: 0.35.5(@types/node@26.6.6)
       tailwindcss:
         specifier: 4.3.5
         version: 4.3.5

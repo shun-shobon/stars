@@ -16,6 +16,7 @@ pnpm lint           # Oxlint（pnpm lint:fix で自動修正）
 pnpm format         # Oxfmt（pnpm format:check で検査のみ）
 pnpm knip           # 未使用のファイル・export・依存の検出
 pnpm gen:catalog    # data/ の CSV から星カタログを再生成
+pnpm gen:milky-way  # NASA の天の川の画像から天の川のタイルを再生成（初回は約400MBを .cache/ にダウンロード）
 pnpm typegen        # wrangler.toml を変えたら Worker の型を再生成
 ```
 
@@ -23,7 +24,7 @@ pnpm typegen        # wrangler.toml を変えたら Worker の型を再生成
 
 ```
 src/
-├── domain/     天体・カメラ・投影の計算と、星カタログのバイナリ形式。DOM・WebGPU・React に依存しない
+├── domain/     天体・カメラ・投影の計算と、星カタログと天の川のタイルの形式。DOM・WebGPU・React に依存しない
 ├── catalog/    星カタログの取得と検証。catalog-meta.json は生成物
 ├── renderer/   WebGPU による描画。WGSL は shaders/ に置く
 ├── viewer/     描画ループ、カメラの状態と入力、canvas の解像度
@@ -32,7 +33,7 @@ src/
 worker/         Cloudflare Worker。/api/* だけを処理し、それ以外は静的アセットを返す
 scripts/        node で直接実行するスクリプト
 data/           星カタログの元データ（Hipparcos 星表と星座線の CSV）
-public/         配信する静的ファイル。stars.bin と constellations.bin は生成物
+public/         配信する静的ファイル。stars.bin、constellations.bin、milky-way/ は生成物
 ```
 
 依存の向きは `ui → viewer → renderer・catalog → domain` で、右側にだけ依存する（間を飛ばしてもよい）。逆向きの import と、レイヤーをまたぐ相対パスの import は `pnpm lint` がエラーにする。レイヤーをまたぐ import は `~/` から書く。
