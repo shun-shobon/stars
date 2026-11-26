@@ -1,0 +1,14 @@
+{
+	"extends": ["@tsconfig/node-lts/tsconfig.json", "@tsconfig/strictest/tsconfig.json"],
+	"compilerOptions": {
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
+		"noEmit": true,
+		"exactOptionalPropertyTypes": false,
+		"verbatimModuleSyntax": true,
+		"allowImportingTsExtensions": true,
+		"erasableSyntaxOnly": true,
+		"types": ["node"]
+	},
+	"include": ["*.config.ts", "scripts"]
+}

@@ -1,13 +1,14 @@
 {
-	"extends": [
-		"@tsconfig/vite-react/tsconfig.json",
-		"@tsconfig/strictest/tsconfig.json",
-	],
+	"extends": ["@tsconfig/vite-react/tsconfig.json", "@tsconfig/strictest/tsconfig.json"],
 	"compilerOptions": {
+		"noEmit": true,
+		"exactOptionalPropertyTypes": false,
+		"verbatimModuleSyntax": true,
 		"types": ["vite/client", "@webgpu/types"],
 		"paths": {
-			"~/*": ["./src/*"],
-		},
+			"~/*": ["./src/*"]
+		}
 	},
-	"exclude": ["**/node_modules", "**/dist"],
+	"include": ["src"],
+	"exclude": ["src/worker.ts"]
 }
