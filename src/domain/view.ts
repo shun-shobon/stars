@@ -1,7 +1,7 @@
 import type { CameraState } from "./camera";
 import { MAX_FOV, MIN_FOV } from "./camera";
-
-type Vec3 = readonly [number, number, number];
+import type { Vec3 } from "./vector";
+import { cross, dot, length, normalize, scale, subtract } from "./vector";
 
 /**
  * 天球（半径1の単位球）を見るカメラの基底と投影パラメーター。
@@ -94,30 +94,6 @@ export function projectToScreen(
 function horizontalToCartesian(azimuth: number, altitude: number): Vec3 {
 	const cosAltitude = Math.cos(altitude);
 	return [cosAltitude * Math.sin(azimuth), Math.sin(altitude), cosAltitude * Math.cos(azimuth)];
-}
-
-function cross(a: Vec3, b: Vec3): Vec3 {
-	return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-}
-
-function dot(a: Vec3, b: Vec3): number {
-	return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-}
-
-function subtract(a: Vec3, b: Vec3): Vec3 {
-	return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
-}
-
-function scale(v: Vec3, factor: number): Vec3 {
-	return [v[0] * factor, v[1] * factor, v[2] * factor];
-}
-
-function length(v: Vec3): number {
-	return Math.hypot(v[0], v[1], v[2]);
-}
-
-function normalize(v: Vec3): Vec3 {
-	return scale(v, 1 / length(v));
 }
 
 function clamp01(value: number): number {
