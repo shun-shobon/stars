@@ -1,11 +1,16 @@
 import type { ReactNode } from "react";
 
-type ConstellationToggleProps = {
+type LayerToggleProps = {
+	/** 表示を切り替える対象の名前 */
+	label: string;
 	isOn: boolean;
 	onChange: (isOn: boolean) => void;
 };
 
-export function ConstellationToggle({ isOn, onChange }: ConstellationToggleProps): ReactNode {
+/**
+ * 星空に重ねる要素の表示を切り替えるスイッチ。
+ */
+export function LayerToggle({ label, isOn, onChange }: LayerToggleProps): ReactNode {
 	return (
 		<button
 			type="button"
@@ -13,11 +18,11 @@ export function ConstellationToggle({ isOn, onChange }: ConstellationToggleProps
 				onChange(!isOn);
 			}}
 			className="flex flex-col items-center text-center"
-			aria-label="星座線を表示"
+			aria-label={`${label}を表示`}
 			aria-pressed={isOn}
 		>
 			<span className="text-starlight-faint mb-0.5 text-[0.65rem] font-medium tracking-[0.12em] uppercase">
-				星座線
+				{label}
 			</span>
 			<span className="flex items-center gap-1.5">
 				<span
@@ -36,7 +41,7 @@ export function ConstellationToggle({ isOn, onChange }: ConstellationToggleProps
 					/>
 				</span>
 				<span
-					className={`text-xs font-light tracking-[0.02em] tabular-nums transition-colors duration-300 sm:text-sm ${
+					className={`hidden text-xs font-light tracking-[0.02em] tabular-nums transition-colors duration-300 sm:inline sm:text-sm ${
 						isOn ? "text-celestial-light" : "text-starlight-faint"
 					}`}
 				>

@@ -4,9 +4,9 @@ import { useState } from "react";
 import { parseObserverDateTimeLocal, toObserverDateTimeLocal } from "~/domain/observer";
 import type { ObservationTime } from "~/viewer/start-starfield-viewer";
 
-import { ConstellationToggle } from "./constellation-toggle";
 import { CornerOrnaments } from "./corner-ornaments";
 import { formatObserverDate, formatObserverTime } from "./format-observer-time";
+import { LayerToggle } from "./layer-toggle";
 import { useNow } from "./use-now";
 
 type ObservatoryHeaderProps = {
@@ -14,6 +14,8 @@ type ObservatoryHeaderProps = {
 	onObservationTimeChange: (time: ObservationTime) => void;
 	areConstellationsVisible: boolean;
 	onConstellationsVisibleChange: (isVisible: boolean) => void;
+	isMilkyWayVisible: boolean;
+	onMilkyWayVisibleChange: (isVisible: boolean) => void;
 	onError: (error: unknown) => void;
 };
 
@@ -23,13 +25,15 @@ const DIVIDER_CLASS_NAME =
 	"h-8 w-px bg-linear-to-b from-transparent via-celestial-gold/30 to-transparent sm:h-10";
 
 /**
- * 観測日時・観測地・星座線の表示を並べた上部のパネル。日時は観測地の現地時刻で表示・入力する。
+ * 観測日時・観測地・星座線と天の川の表示を並べた上部のパネル。日時は観測地の現地時刻で表示・入力する。
  */
 export function ObservatoryHeader({
 	observationTime,
 	onObservationTimeChange,
 	areConstellationsVisible,
 	onConstellationsVisibleChange,
+	isMilkyWayVisible,
+	onMilkyWayVisibleChange,
 	onError,
 }: ObservatoryHeaderProps): ReactNode {
 	const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -42,7 +46,7 @@ export function ObservatoryHeader({
 				<div className="panel-celestial px-3 py-2 sm:px-5 sm:py-3">
 					<CornerOrnaments />
 
-					<div className="flex items-center gap-3 sm:gap-4">
+					<div className="flex items-center gap-2 whitespace-nowrap sm:gap-4">
 						<div className="flex items-center gap-2 sm:gap-3">
 							<p className="flex flex-col text-center sm:text-right">
 								<span className="text-starlight-dim text-[10px] sm:text-xs">
@@ -80,10 +84,18 @@ export function ObservatoryHeader({
 
 						<div className={DIVIDER_CLASS_NAME} />
 
-						<ConstellationToggle
-							isOn={areConstellationsVisible}
-							onChange={onConstellationsVisibleChange}
-						/>
+						<div className="flex items-center gap-2 sm:gap-3">
+							<LayerToggle
+								label="星座線"
+								isOn={areConstellationsVisible}
+								onChange={onConstellationsVisibleChange}
+							/>
+							<LayerToggle
+								label="天の川"
+								isOn={isMilkyWayVisible}
+								onChange={onMilkyWayVisibleChange}
+							/>
+						</div>
 					</div>
 
 					{isPickerOpen && (
