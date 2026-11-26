@@ -21,7 +21,6 @@
 		"typegen": "wrangler types worker/worker-configuration.d.ts"
 	},
 	"dependencies": {
-		"jotai": "3.0.2",
 		"react": "19.3.1",
 		"react-dom": "19.3.1"
 	},
