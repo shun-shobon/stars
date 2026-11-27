@@ -2,12 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CONSTELLATION_LINE_RECORD_BYTES, STAR_RECORD_BYTES } from "~/domain/catalog-format";
 
-import {
-	CATALOG,
-	CatalogLoadError,
-	fetchConstellationLineRecords,
-	streamStarRecords,
-} from "./load-catalog";
+import { CatalogLoadError } from "./fetch-catalog-file";
+import { CATALOG, fetchConstellationLineRecords, streamStarRecords } from "./load-catalog";
 
 const STARS_BYTES = CATALOG.starCount * STAR_RECORD_BYTES;
 

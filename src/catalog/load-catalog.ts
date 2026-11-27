@@ -1,6 +1,7 @@
 import { CONSTELLATION_LINE_RECORD_BYTES, STAR_RECORD_BYTES } from "~/domain/catalog-format";
 
 import catalogMeta from "./catalog-meta.json";
+import { CatalogLoadError, failOnNetworkError, fetchCatalogFile } from "./fetch-catalog-file";
 
 /**
  * 生成スクリプトが書き出したカタログの件数と、最も暗い星の等級。
@@ -10,13 +11,6 @@ export const CATALOG: {
 	faintestMagnitude: number;
 	constellationLineCount: number;
 } = catalogMeta;
-
-export class CatalogLoadError extends Error {
-	constructor(message: string, options?: ErrorOptions) {
-		super(message, options);
-		this.name = "CatalogLoadError";
-	}
-}
 
 /**
  * 星のレコードを届いた分から順に渡す。塊はレコードの境界で区切り、ファイル先頭からのバイト位置を添える。
@@ -79,31 +73,6 @@ export async function fetchConstellationLineRecords(
 		throw new CatalogLoadError(`${path} has ${records.length} bytes, expected ${expectedBytes}.`);
 	}
 	return records;
-}
-
-async function fetchCatalogFile(path: string, signal: AbortSignal): Promise<Response> {
-	const response = await failOnNetworkError(`Failed to fetch ${path}.`, () =>
-		fetch(path, { signal }),
-	);
-	if (!response.ok) {
-		throw new CatalogLoadError(`Failed to fetch ${path}: HTTP ${response.status}.`);
-	}
-	return response;
-}
-
-/**
- * 通信の失敗（fetch が投げる TypeError）を CatalogLoadError にする。
- * 中断は呼び出し元が意図したものなので、そのまま伝える。
- */
-async function failOnNetworkError<T>(message: string, operation: () => Promise<T>): Promise<T> {
-	try {
-		return await operation();
-	} catch (error) {
-		if (!(error instanceof TypeError)) {
-			throw error;
-		}
-		throw new CatalogLoadError(message, { cause: error });
-	}
 }
 
 function concat(a: Uint8Array, b: Uint8Array): Uint8Array<ArrayBuffer> {

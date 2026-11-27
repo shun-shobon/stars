@@ -1,4 +1,4 @@
-import { CatalogLoadError } from "~/catalog/load-catalog";
+import { CatalogLoadError } from "~/catalog/fetch-catalog-file";
 import { ObserverTimeError } from "~/domain/observer";
 import { GpuDeviceLostError, GpuUnavailableError, GpuValidationError } from "~/renderer/gpu-canvas";
 

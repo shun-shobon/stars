@@ -31,6 +31,12 @@ const ALPHA_BLEND: GPUBlendState = {
 	alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" },
 };
 
+/**
+ * 天の川のタイルの画素値 1 に当てるシーンの明るさ。夏の銀河中心付近が白く飛ばず、
+ * 冬の淡い部分も地色からわずかに浮く程度にする。
+ */
+const MILKY_WAY_INTENSITY = 0.8;
+
 /** 重なった星の光を足し合わせる */
 const ADDITIVE_BLEND: GPUBlendState = {
 	color: { srcFactor: "src-alpha", dstFactor: "one", operation: "add" },
@@ -48,6 +54,7 @@ export function createPipelines(
 			label: "Background",
 			module: device.createShaderModule({ label: "Background", code: BACKGROUND_WGSL }),
 			format: HDR_TEXTURE_FORMAT,
+			constants: { MILKY_WAY_INTENSITY },
 		}),
 		constellation: createInstancedQuadPipeline(device, {
 			label: "Constellation",

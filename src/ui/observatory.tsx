@@ -21,6 +21,7 @@ export function Observatory(): ReactNode {
 	const [failure, setFailure] = useState<{ error: unknown } | null>(null);
 	const [observationTime, setObservationTime] = useState<ObservationTime>({ kind: "realtime" });
 	const [areConstellationsVisible, setAreConstellationsVisible] = useState(true);
+	const [isMilkyWayVisible, setIsMilkyWayVisible] = useState(true);
 
 	useEffect(() => {
 		const canvas = canvasRef.current;
@@ -51,6 +52,10 @@ export function Observatory(): ReactNode {
 		viewer?.setConstellationsVisible(areConstellationsVisible);
 	}, [viewer, areConstellationsVisible]);
 
+	useEffect(() => {
+		viewer?.setMilkyWayVisible(isMilkyWayVisible);
+	}, [viewer, isMilkyWayVisible]);
+
 	if (failure != null) {
 		return <ErrorPanel {...describeError(failure.error)} />;
 	}
@@ -70,6 +75,8 @@ export function Observatory(): ReactNode {
 				onObservationTimeChange={setObservationTime}
 				areConstellationsVisible={areConstellationsVisible}
 				onConstellationsVisibleChange={setAreConstellationsVisible}
+				isMilkyWayVisible={isMilkyWayVisible}
+				onMilkyWayVisibleChange={setIsMilkyWayVisible}
 				onError={(error) => {
 					setFailure({ error });
 				}}

@@ -10,6 +10,7 @@ export function packSceneUniforms(
 	view: ViewBasis,
 	latitudeRad: number,
 	localSiderealTime: number,
+	milkyWayVisibility: number,
 ): Float32Array<ArrayBuffer> {
 	return new Float32Array([
 		...view.viewDir,
@@ -22,7 +23,7 @@ export function packSceneUniforms(
 		view.tanHalfFov,
 		view.projectionScale,
 		view.cullRadius,
-		0,
+		milkyWayVisibility,
 		0,
 	]);
 }

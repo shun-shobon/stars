@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CameraState } from "./camera";
 import { MAX_FOV, MIN_FOV } from "./camera";
-import { computeViewBasis, projectToScreen } from "./view";
+import { computeViewBasis, projectToScreen, screenToDirection } from "./view";
 
 const NORTH_HORIZON: CameraState = { azimuth: 0, altitude: 0, fov: Math.PI / 2 };
 
@@ -46,5 +46,28 @@ describe("projectToScreen", () => {
 		const basis = computeViewBasis(NORTH_HORIZON, 1);
 
 		expect(projectToScreen(basis, Math.PI, 0)).toBeNull();
+	});
+});
+
+describe("screenToDirection", () => {
+	it("画面の中心は、カメラが下がっていても視線の方向を指す", () => {
+		const basis = computeViewBasis({ ...NORTH_HORIZON, fov: MAX_FOV }, 1.6);
+
+		const direction = screenToDirection(basis, { x: 0.5, y: 0.5 });
+
+		for (const [axis, value] of basis.viewDir.entries()) {
+			expect(direction[axis]).toBeCloseTo(value, 10);
+		}
+	});
+
+	it("求めた方向を projectToScreen で投影すると元の画面上の点に戻る", () => {
+		const basis = computeViewBasis({ azimuth: 1, altitude: 0.4, fov: MAX_FOV }, 1.6);
+		const point = { x: 0.2, y: 0.7 };
+
+		const [east, zenith, north] = screenToDirection(basis, point);
+		const projected = projectToScreen(basis, Math.atan2(east, north), Math.asin(zenith));
+
+		expect(projected?.x).toBeCloseTo(point.x, 10);
+		expect(projected?.y).toBeCloseTo(point.y, 10);
 	});
 });
